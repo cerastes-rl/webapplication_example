@@ -18,10 +18,10 @@
 
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	// "forwardPorts": [],
-	"forwardPorts": [5173, 8000]
+	"forwardPorts": [5173, 8000],
 
-	// Use 'postCreateCommand' to run commands after the container is created.
-	// "postCreateCommand": "pip3 install --user -r requirements.txt",
+	// Create/reuse the backend virtual environment and install dependencies on container creation.
+	"postCreateCommand": "python -m venv backend/.venv && backend/.venv/bin/python -m pip install -r backend/requirements.txt",
 
 	// Configure tool-specific properties.
 	// "customizations": {},

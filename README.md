@@ -1,150 +1,103 @@
+# SSScribe — Transcription workspace
 
-# Speech-to-Text Web App (Mock Prototype)
+SSScribe is currently a **frontend-only UI preview** for submitting recordings, following run progress, and reading sample transcripts. It uses navy-blue accents and an optional dark theme. **No file bytes are uploaded or saved, no API is called by the UI, and no speech recognition is performed.** No Azure account or credentials are needed.
 
-A local prototype of a web application for uploading recordings, tracking transcription jobs, and viewing completed transcripts. **This version does not perform real speech recognition or use live Azure services.** It is intended to validate the user experience, API contracts, and overall architecture before production integration.
+## Documentation
 
-## Documentation and delivery sequence
+- [Project structure](docs/PROJECT_STRUCTURE.md): directory tree, file responsibilities, app flow and where to make common changes.
+- [Frontend guide](frontend/README.md): controls, preview scenarios, file boundaries and manual review checklist.
+- [Requirements](docs/REQUIREMENTS.md): current implementation coverage and connected-MVP acceptance criteria.
+- [Implementation plan](docs/IMPLEMENTATION_PLAN.md): resolved decisions, progress, review gate and future backend steps.
+- [UI research](docs/UI_RESEARCH.md): public product references and design rationale.
+- [Agent instructions](AGENTS.md): implementation constraints.
 
-- [Requirements and acceptance criteria](docs/REQUIREMENTS.md) — prioritized scope and milestone gates.
-- [UI research and recommendations](docs/UI_RESEARCH.md) — design rationale and deferred features.
-- [Implementation plan](docs/IMPLEMENTATION_PLAN.md) — small UI-first slices, an explicit UI approval gate, then staged API/persistence integration and verification.
-- [Agent constraints](AGENTS.md) — architecture and implementation boundaries.
+## What works today
 
-Start small: **M1 is a UI-only preview**. Begin with a static recordings dashboard and a read-only transcript slice, then add preview sign-in/upload/retry, all loading/error scenarios and responsive accessibility. Stop for explicit UI approval before backend integration. Temporary typed presentation fixtures outside components are allowed only for this clearly labeled preview; simulated uploads must not claim to save files.
+- Persistent SSScribe banner, Upload/History navigation, development identity and mock sign-out/sign-in. The preview initially opens signed in on History.
+- Dedicated Upload page: MP3/WAV picker, non-empty file and **4 GB (4,000,000,000 bytes)** size validation, requested speakers (Automatic or 1–10), English language, speaker-label and timestamp options (both enabled by default).
+- Begin upload creates an in-memory Run ID and navigates to History. Simulated progress continues during internal navigation: uploading → finalizing → queued → processing → completed.
+- History displays Run ID/filename, submitted time, size, requested speakers, settings, status and actions. Four initial fixtures include three completed examples and one retriable processing failure. Cancelled runs remain visible.
+- Read-only sample transcript and run details. All recordings share illustrative text, unrelated to their audio. Options control sample speaker-label/timestamp presentation, not audio analysis.
+- Preview controls for empty/error History and a short loading state; cancel simulated uploads and retry the failed example.
+- Mock sign-out hides recording views and warns before cancelling an active simulated upload. Queued/processing simulation pauses while signed out; signing back in resumes it.
+- Dark-mode toggle on every screen. First use follows system preference; the selected theme is saved under `ssscribe-theme` in localStorage when available. Only that preference persists.
+- Responsive shell and locally scrollable History table on small screens, labeled controls, skip link, focus styles and reduced-motion support. Browser/accessibility acceptance review is still pending.
 
-**M2 is the connected local MVP:** replace the preview data boundary with a typed `/api` client and FastAPI mock services. FastAPI/SQLite must then be authoritative for records, job statuses and transcripts, with actual uploaded bytes persisted locally. Do not retain a hidden frontend fixture fallback when the backend is unavailable. M1 alone does not satisfy the connected MVP definition of done.
+Reloading resets run data, form selections, navigation and mock sign-in state to the initial preview. There is no routing/deep-link support, real authentication, database, stored audio, or persistent transcript yet. The file picker checks extension and size, not audio contents or authoritative MIME validity.
 
-## Current implementation
+## Run the UI (backend not required)
 
-The repository currently contains a React/Vite starter screen (counter and framework links) and a FastAPI `GET /api/health` endpoint returning `{"status":"OK!"}`. The Vite `/api` proxy is configured, but the starter UI does not yet call it. There is no transcription dashboard, mock auth, upload flow, typed API client, SQLite model, seed dataset or job worker yet. SQLAlchemy is not yet included in backend dependencies, and no application test suite is present.
-
-The architecture and product flows below describe the **target**, not capabilities already implemented.
-
-## Goals
-
-- Provide a straightforward, authenticated-style interface for managing uploaded audio files.
-- Show file metadata and transcription status in a dashboard.
-- Support uploading a recording and simulating asynchronous transcription.
-- Display readable transcripts for completed jobs, with retry/error handling.
-- Keep the frontend/backend contracts close to the intended production Azure architecture.
-
-## Technology stack
-
-| Layer | Local prototype technology (implemented or planned) | Intended production service |
-|---|---|---|
-| Frontend | React + TypeScript + Vite, pnpm, Oxlint | Azure Static Web Apps |
-| Backend | Python + FastAPI + Uvicorn | Linux Azure App Service Web App |
-| Database | SQLite + SQLAlchemy | SQL Server / Azure SQL Database |
-| Authentication | Mock development identity | Microsoft Entra ID |
-| Audio storage | Local file storage adapter | Azure Blob Storage |
-| Background jobs | Local queue / simulated worker | Azure Queue Storage + Python worker |
-| Transcription | Deterministic mock result generator | Python worker or external transcription service |
-| Development environment | VS Code Dev Container | Not deployed as a container |
-
-## Conceptual application flow
-
-```mermaid
-flowchart TB
-    U[User / Browser]
-    F[React + TypeScript UI]
-    A[FastAPI Backend]
-    DB[(SQLite)]
-    S[(Local Audio Storage)]
-    Q[Mock Job Queue]
-    W[Mock Transcription Worker]
-
-    U -->|1. Use application| F
-    F -->|2. File and job API requests| A
-    F -->|3. Upload request via API| A
-    A -->|4. Store audio| S
-    A -->|5. Save records| DB
-    A -->|6. Enqueue job| Q
-    Q -->|7. Job ID| W
-    S -->|8. Audio reference| W
-    W -->|9. Store status and sample transcript| DB
-    DB -->|10. Query results| A
-    A -->|11. Return JSON| F
-```
-
-The planned prototype simplifies the production upload path by allowing uploads through FastAPI. In production, FastAPI is intended to authorize uploads and the browser will send file bytes directly to private Azure Blob Storage. Service adapters should keep this replacement straightforward.
-
-## Repository layout
-
-```text
-transcription-app/
-├── .devcontainer/    # VS Code development environment
-├── frontend/         # React + TypeScript application
-├── backend/          # FastAPI health endpoint; persistence/mock services planned
-├── docs/             # Requirements, UI research and incremental implementation plan
-├── AGENTS.md         # Coding-agent instructions
-└── README.md         # Project overview and setup
-```
-
-> The exact internal `frontend/` and `backend/` layout can evolve during implementation.
-
-## Run locally
-
-Requirements: VS Code Dev Container with Python and Node.js, and **pnpm** for frontend dependency management.
-
-**Frontend** — terminal 1:
+Use the development container's Node.js/pnpm environment:
 
 ```bash
 cd frontend
-pnpm install
-pnpm dev --host 0.0.0.0
+pnpm install                     # first run / dependency changes
+pnpm dev --host 0.0.0.0 --port 5173 --strictPort
 ```
 
-Open `http://localhost:5173`.
+Open **http://localhost:5173**. Existing VS Code tasks/dev-container startup may already have started it; do not launch a duplicate server. The Vite `/api` proxy to port 8000 remains configured for future integration, but the current UI does not use it.
 
-**Backend** — terminal 2:
+### Checks
+
+```bash
+cd frontend
+pnpm lint
+pnpm build                       # TypeScript check + Vite production build
+```
+
+Lint/build and ad hoc preview-lifecycle assertions passed during frontend implementation. There is **no committed automated application test suite or `pnpm test` script**. Visual, keyboard, responsive and dark/light browser review remains necessary; see the [frontend checklist](frontend/README.md#checks). Do not treat build success as UI approval.
+
+## Optional backend (health only)
 
 ```bash
 cd backend
-python -m venv .venv       # first run only
+python -m venv .venv             # first run only; reuse existing venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
 python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-FastAPI runs at `http://localhost:8000`; interactive API docs are available at `http://localhost:8000/docs`.
+- `GET http://localhost:8000/api/health` → `{"status":"OK!"}`.
+- FastAPI OpenAPI UI: http://localhost:8000/docs.
+- No auth/file/upload/run/transcript/job routes exist yet. SQLAlchemy is not in requirements.
 
-The Vite development server proxies `/api` requests to FastAPI. The backend's `requirements.txt` and startup module should be kept in sync with the implementation. The first-run SQLite initialization and sample-data seeding behavior will be documented when implemented.
+The dev container forwards 5173/8000. On container creation, `postCreateCommand` creates or reuses `backend/.venv` and installs `backend/requirements.txt`. Run **Dev Containers: Rebuild Container** to apply this setup to an existing container; it does not run on every restart. After requirements change, rerun `backend/.venv/bin/python -m pip install -r backend/requirements.txt` from the repository root. `.vscode/tasks.json` defines automatic startup tasks; `.devcontainer/start-dev.sh` also checks those ports before starting servers and writes logs under `.devcontainer/logs/`. Its backend dependency install runs only when creating a missing venv, so update an existing environment explicitly after requirements changes. The helper does not install frontend dependencies.
 
-## Prototype functionality
+## Repository layout
 
-**Planned implementation:**
+For the complete directory tree, configuration files, generated directories and a “where do I change this?” reference, see the [project structure guide](docs/PROJECT_STRUCTURE.md).
 
-1. A mock sign-in/sign-out experience with a fixed development user.
-2. A dashboard showing seeded recordings, file details, and job statuses.
-3. A file-upload control with progress and file validation.
-4. SQLite-backed file, job, and transcript records.
-5. Mock queued/processing/completed/failed transitions and simulated transcription text.
-6. Transcript detail display and retry for failed jobs.
+```text
+frontend/
+  src/App.tsx           # Shell, theme, navigation and preview session/timer
+  src/components.tsx    # Shared visuals, Upload and run details
+  src/preview.ts        # Typed fixtures, sample transcript and transitions
+  src/App.css           # Layout/component styles
+  src/index.css         # Theme tokens and global styles
+backend/
+  main.py               # FastAPI health endpoint only
+  requirements.txt      # Current Python runtime dependencies
+docs/                   # Requirements, implementation plan and UI research
+```
 
-In the connected MVP, the frontend must read these records via FastAPI, not store a separate authoritative set of mock data. The earlier UI-only milestone may use clearly labeled temporary typed fixtures outside components, as described in the requirements.
+Project documentation is in `docs/`; development configuration is in `.devcontainer/` and `.vscode/`. No `backend/data/` directory or reset/seed command is implemented.
 
-## API design
+## Next milestone: connected local mock (not implemented)
 
-The backend will expose production-shaped HTTP/JSON endpoints for files, transcript retrieval, upload authorization/completion, and retry. A local-only upload route may be used for transmitting file bytes in development. See the [requirements](docs/REQUIREMENTS.md) for proposed routes, upload policy, job behavior and acceptance criteria, and `AGENTS.md` for implementation boundaries. These endpoints beyond health are not implemented yet.
+**Review and approve the UI before backend integration.** Then replace the preview boundary with a typed FastAPI client. API failure must show an error, never silently fall back to frontend fixtures.
 
-## What's mocked vs. real?
+| Responsibility | Current preview | Planned connected local MVP | Eventual production |
+|---|---|---|---|
+| UI | React/TypeScript/Vite, pnpm, Oxlint | Same UI with typed API client | Azure Static Web Apps |
+| Authentication | Presentation-only identity | Fixed-user mock backend session | Microsoft Entra ID |
+| Run/file/job metadata | React memory | SQLite via SQLAlchemy | Azure SQL / SQL Server |
+| Audio | Not read or transferred | Streaming local file adapter | Private Azure Blob Storage |
+| Queue/transcription | Browser timer/sample text | SQLite jobs, local runner, fake adapter | Azure Queue Storage/worker and Azure transcription service |
+| Transcript | Shared frontend sample | SQLite `TEXT` | Azure SQL `NVARCHAR(MAX)` |
+| Backend hosting | Health-only FastAPI | FastAPI/Uvicorn | Azure App Service |
 
-For the **connected MVP target** (not the current starter):
+The connected flow creates a stable run and saves options **before** transfer, streams a single request to disk with bounded memory, and shows measured progress in History. Internal navigation must not cancel transfer. Refresh/close/network loss can interrupt it; retry starts at zero and may require file reselection. No resumable/chunked/parallel upload or automatic retry is planned initially. Finalizing remains separate from queued until storage is verified. Backend jobs then continue without the browser.
 
-- **Real local behavior:** React UI, network calls from React to FastAPI, uploaded-file persistence, SQLite operations, request/response validation, and basic job lifecycle.
-- **Mocked external services:** Entra authentication, Azure Blob Storage, Azure Queue Storage, and speech-to-text inference. No Azure credentials are needed.
+Store provider/object keys internally in SQL; do not expose filesystem paths, private Blob locations or credentials in History/API DTOs. Save readable transcript text in SQL. Optional future raw result JSON/exports may live in Blob Storage with SQL references. Azure integration must arrange supported private-blob access and asynchronous job submission/result retrieval; no Azure SDKs or cloud calls are implemented now.
 
-The UI-only preview simulates these interactions visibly and does not persist uploads. See [Current implementation](#current-implementation) for what exists today.
-
-## Future production direction
-
-Keep the replaceable interfaces while migrating:
-
-- Mock auth → Microsoft Entra ID and server-side authorization.
-- SQLite → SQL Server / Azure SQL Database.
-- Local file adapter → private Azure Blob Storage and short-lived upload SAS.
-- Mock queue → Azure Queue Storage.
-- Simulated transcription → Python transcription worker or an external speech service.
-- Local Vite/FastAPI → Azure Static Web Apps and Linux Azure App Service.
-
-**Current priority:** Validate the UI-only milestone first, then connect and test the persistent local mock API. Avoid premature Azure configuration or production infrastructure work.
+Proposed local persistence paths are `backend/data/app.db` and `backend/data/uploads/`. Add Git exclusions for DBs, sidecars, uploads and partial files **before generating them**; current ignore rules do not cover these paths. Seed/reset/cleanup commands and worker recovery behavior must be documented when they actually exist. Never commit local data, credentials, venvs, dependencies or generated builds.
