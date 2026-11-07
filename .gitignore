@@ -11,3 +11,6 @@
 .env
 .env.*
 !.env.example
+
+# avoid generated logs?
+.devcontainer/logs/
