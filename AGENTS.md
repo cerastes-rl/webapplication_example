@@ -1,5 +1,5 @@
 
-# AGENTS.md — Transcription Application
+# AGENTS.md — SSScribe
 
 ## Objective
 
@@ -15,9 +15,20 @@ Build a **working local mock** of an authenticated speech-to-text web applicatio
 
 Inspect the repository before changing files. Reuse established conventions and avoid replacing working setup or adding a separate JavaScript server.
 
-## Target prototype
+## Current milestone and resolved product decisions
 
-1. **File dashboard:** list uploaded recordings, dates, size, and status (`queued`, `processing`, `completed`, `failed`).
+- **SSScribe is currently frontend-only:** navy accents, optional dark mode, persistent banner with logo/title/theme/user/sign-out, Upload/History sidebar, dedicated Upload page and run details. It starts signed in as the development user on History. No API calls or actual uploads occur.
+- Typed sample data and transitions are in `frontend/src/preview.ts`; shell/navigation/session/timer are in `App.tsx`, shared visuals/Upload/details in `components.tsx`. Temporary explicitly labeled fixtures are allowed for this UI milestone, not as a future API-failure fallback.
+- Preview runs/form/navigation reset on reload. Only theme preference (`ssscribe-theme` in localStorage when available) persists. Simulation continues across internal navigation but pauses signed out. This is not a backend session or worker.
+- Backend currently exposes health only. No SQLAlchemy, database, file storage, queue, upload routes or server auth has been implemented. Browser/accessibility review, committed app tests and UI approval remain pending. **Do not start backend integration before UI approval.**
+- Current file policy: non-empty MP3/WAV up to **4 GB (4,000,000,000 bytes inclusive)**. Picker validates extension/size only. Requested speakers are Automatic or 1–10, language English, speaker labels/timestamps default on; these settings do not perform actual recognition.
+- Connected MVP target: create persistent run/options before transfer; History shows uploading/finalizing and all processing outcomes, including failed/cancelled submissions. A shell-level single-request upload survives internal navigation, reports measured progress and streams to disk with bounded memory. Interruption requires restart/reselection; defer resumable/chunked uploads. Handle cancel/failure/partial cleanup and stale-upload recovery. Browser closure does not promise continued transfer; queued backend jobs can continue.
+- Store audio storage provider/object key in SQL as private metadata, never user-facing paths/credentials. Store readable transcripts in SQLite `TEXT`, later Azure SQL `NVARCHAR(MAX)`. Optional future raw-result JSON/exports can live in Blob Storage with SQL references.
+- See [README](README.md), [requirements](docs/REQUIREMENTS.md) and [implementation plan](docs/IMPLEMENTATION_PLAN.md) for current coverage, unresolved contracts and acceptance gates. Preserve the implementation constraints below.
+
+## Target connected prototype (not implemented yet)
+
+1. **History:** list every run, including active/interrupted uploads, with Run ID, filename, submission time, size, requested speakers/settings and status. Keep upload/run stages separate from job states (`queued`, `processing`, `completed`, `failed`).
 2. **Upload interface:** choose a local audio file and show a realistic upload/queued workflow.
 3. **Transcript view:** select a completed file to read a formatted transcript. For an incomplete file, show its status.
 4. **Job simulation:** queued jobs progress to completed or failed; allow retry of failures. Use deterministic sample transcripts rather than running speech recognition.
@@ -40,7 +51,7 @@ Preserve the eventual Azure-oriented architecture, but replace external calls wi
 
 **Important:** keep API endpoints, JSON responses, service method names, and job lifecycle realistic. Mock the external service implementations behind clearly named interfaces/adapters. Do not add Azure credentials, request live cloud resources, or call real speech APIs.
 
-The browser should communicate with **FastAPI**, not directly with SQLite or ad hoc mock JSON inside React. The backend should be authoritative for file records, statuses, and transcripts. For the prototype, uploading a file may use a multipart FastAPI endpoint; retain an abstraction for a future direct-to-Blob upload authorization/confirmation flow. Do not pretend a local upload URL is an actual Azure SAS token.
+In the connected MVP, the browser must communicate with **FastAPI**, not directly with SQLite or an authoritative ad hoc frontend dataset. The current explicitly labeled UI-only preview is the temporary exception described above. The backend should be authoritative for file records, statuses, and transcripts. For the prototype, uploading a file may use a multipart FastAPI endpoint; retain an abstraction for a future direct-to-Blob upload authorization/confirmation flow. Do not pretend a local upload URL is an actual Azure SAS token.
 
 ## Suggested API contract
 
@@ -62,15 +73,18 @@ For a working local browser upload, add a clearly identified **development uploa
 
 Use SQLite (e.g., `backend/data/app.db`, ignored by Git) via SQLAlchemy. Start with minimal tables:
 
-- `files`: id, filename, content type, size, local object path, uploader, created timestamp.
-- `jobs`: id, file id, status, attempts, timestamps, error message.
-- `transcripts`: id, file id or job id, text, optional original mock JSON, created timestamp.
+- `runs`: stable Run ID, file relationship, requested speakers/settings, submitted time, upload/run state and failure stage; visible before transfer finishes.
+- `files`: id, filename, content type, actual size, internal storage provider/object key, uploader, created timestamp.
+- `jobs`: id, run/file relationship, processing status, attempts, timestamps, error message.
+- `transcripts`: id, run/file/job relationship, readable text (`TEXT` locally), created timestamp; optional future raw-artifact reference.
+
+Retry processing retains run/file/options; future reprocessing with changed settings creates a new run. Raw result artifacts are not required initially. Add database/upload/partial/sidecar Git exclusions before generating these stores; current `.gitignore` does not yet cover them.
 
 Seed a **small, deterministic** dataset for a first-run demonstration; avoid reseeding duplicates. A local uploaded file should persist between backend restarts. Keep schema migration complexity proportional to a prototype.
 
 ## UI guidelines
 
-Use React + TypeScript with a clean, accessible interface. Favor simple component separation (dashboard, upload, status, transcript details). Use existing project dependencies and styling first; do not introduce a large UI/state framework unless needed. Keep all backend calls in a small typed API client, rather than embedding mock file lists in components. Poll job status conservatively while jobs are active, and stop polling when unnecessary.
+Use React + TypeScript with a clean, accessible interface, SSScribe branding, navy-blue accents and light/dark theme tokens. Favor simple component separation (dashboard, upload, status, transcript details). Use existing project dependencies and styling first; do not introduce a large UI/state framework unless needed. Keep all backend calls in a small typed API client, rather than embedding mock file lists in components. Poll job status conservatively while jobs are active, and stop polling when unnecessary.
 
 ## Implementation constraints
 
@@ -82,6 +96,6 @@ Use React + TypeScript with a clean, accessible interface. Favor simple componen
 - Maintain the existing Vite-to-FastAPI `/api` proxy and use the dev container's forwarded ports (5173 frontend, 8000 backend).
 - Do not break current functionality; add targeted tests for API behavior, job state transitions, and core UI interactions where practical.
 
-## Definition of done
+## Connected-MVP definition of done (future gate)
 
 A developer can start the Vite and FastAPI servers and, entirely locally, sign in as a mock user, see example files, upload a file, observe its queued/processing/completed state, open a transcript, and retry a failed job. Reloading the page preserves records in SQLite. No Azure account or API credentials are required. Document startup commands, mock behavior, limitations, and future Azure replacement points in `README.md`.

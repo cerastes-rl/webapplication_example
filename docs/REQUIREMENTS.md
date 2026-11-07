@@ -1,100 +1,122 @@
-# Local transcription prototype requirements
+# SSScribe requirements
 
-## Purpose and current baseline
+## Scope and current baseline
 
-Build a small, usable local demonstration of the recording-to-transcript journey, **UI first**, then connect it to FastAPI mock services. This document specifies intended behavior, not completed functionality. [AGENTS.md](../AGENTS.md) remains the implementation constraint source; [UI research](UI_RESEARCH.md) provides design rationale, not additional mandatory product scope.
+This document separates **current frontend coverage** from **target acceptance criteria**. [Implementation plan](IMPLEMENTATION_PLAN.md) describes delivery; [UI research](UI_RESEARCH.md) explains design rationale; [AGENTS.md](../AGENTS.md) governs implementation constraints.
 
-Repository inspection at this review found:
+- **M1 — UI preview, implemented for review:** React/TypeScript/Vite, plain CSS, navy accents, dark/light themes, persistent shell, Upload/History navigation, run details, simulated lifecycle and mock identity. Typed fixtures/sample text live in `frontend/src/preview.ts`; shell/timers are in `App.tsx`, presentation in `components.tsx`.
+- **M1 acceptance is not complete:** no committed application tests; browser, keyboard, responsive and accessibility review is pending. Some scenarios/recovery details below remain gaps, not completed features.
+- **Backend today:** `GET /api/health` only, returning `{"status":"OK!"}`. No API client, backend auth, uploads, SQLite/SQLAlchemy models, seed logic or worker exists. Vite's `/api` proxy and forwarded 5173/8000 ports are preserved.
+- **M2 — connected local MVP, planned:** FastAPI/SQLite become authoritative, actual audio persists locally, and a worker generates deterministic sample transcripts. M1 alone does not satisfy this milestone.
+- **P1:** optional improvements after M2. No Azure account/credentials or real transcription is required for either local milestone.
 
-- `frontend/src/App.tsx` is the React/Vite starter counter and links, with starter CSS; there is no transcription UI, typed API client, or mock sign-in yet.
-- `backend/main.py` only implements `GET /api/health`, returning `{"status":"OK!"}`. No file, upload, transcript, auth, or job endpoints exist.
-- React/TypeScript, pnpm, Oxlint, FastAPI/Uvicorn and the Vite `/api` proxy to port 8000 are configured. Dev-container ports are 5173 and 8000.
-- SQLAlchemy is not yet in `backend/requirements.txt`; SQLite models, persistent storage, seeding and a worker are not implemented. No application test suite is present.
+Stop for explicit UI approval before backend integration. Keep existing pnpm/Oxlint and Python venv/requirements workflows; no separate JavaScript server, large UI/state framework or cloud infrastructure.
 
-## Scope, priorities and delivery gates
+## Resolved product behavior
 
-- **P0 / M1 — UI-only preview:** validate three surfaces (mock sign-in, recordings dashboard/upload, transcript detail) without needing new backend endpoints. Temporary typed presentation fixtures outside components are permitted **only in this milestone**. Explicitly label all simulated actions; no claim of uploading, persistence, authentication security, or transcription.
-- **P0 / M2 — Connected local MVP:** replace the preview boundary with a small typed `/api` client and FastAPI-backed services. FastAPI/SQLite become authoritative for records, statuses and transcripts; actual uploaded bytes persist locally. M1 is not the connected MVP or the AGENTS definition of done.
-- **P1 / after M2:** small usability improvements, only after the core flow is verified. Not release gates for M1 or M2.
+### Application structure
 
-M1 can be reviewed with fixture scenarios before implementing database, upload or worker behavior. M2 must not silently fall back to fixtures on API failure. Both milestones retain React/TypeScript/Vite, pnpm/Oxlint, the existing Python venv/requirements workflow and `/api` proxy. Use existing dependencies and simple component separation first; do not introduce a separate JavaScript server or a large UI/state framework.
+- Product name: **SSScribe**. Navy-blue accents, light/dark themes and a keyboard-accessible top-bar theme toggle available even while signed out. Theme initializes from stored choice or system preference and is stored under `ssscribe-theme` if localStorage is available; it is not user/job persistence.
+- Persistent banner: logo/title, local-demo indicator, development identity and far-right sign-out. Narrow layouts may hide supplemental identity/badge text while retaining core controls and a clear preview notice.
+- Signed-in sidebar has **Upload** and **History** only; run details open from History. On mobile the navigation reflows above content. Navigation currently uses React state, not URL routes/deep links.
+- Upload page: single-file picker, size/format guidance, requested speaker count, language, speaker labels, timestamps and Begin upload.
+- History: all submissions, including uploading runs. Columns include Run ID/filename, submitted time, size, requested speakers, settings, status and actions. Settings are currently grouped in one column. Small screens use a locally scrollable table.
+- Details: full run metadata/options, current state, sample transcript when complete, error/retry when failed and Back to History. No storage path is exposed.
 
-### Non-goals
+### Current policy and lifecycle
 
-No real speech recognition, OAuth/Entra integration, Azure credentials/resources, real SAS tokens, production deployment/security claims, Redis, Celery or Docker orchestration. Defer waveform/playback synchronization, transcript editing/versioning, actual diarization, subtitle export, translation, summaries/chat, meeting bots, collaboration, public sharing, integrations, billing and quotas. The mock is for local development, not exposure to untrusted users.
+The current UI accepts a **non-empty `.mp3` or `.wav` file up to 4 GB (4,000,000,000 bytes inclusive)**. It checks extension/size only; the picker lists MIME hints but does not verify audio content or contradictory MIME metadata. These checks must become authoritative server validation in M2. The former 25 MiB proposal is no longer applicable.
 
-## M1 requirements — UI preview
+Speaker choices are Unknown/Automatic (default) or 1–10, language is English only, and speaker labels/timestamps default on. These are current UI choices; production service support/ranges must be checked during future integration. All settings are sample presentation metadata, not actual audio recognition.
 
-| ID | Priority | Requirement and acceptance criteria |
+Current simulation:
+
+```text
+Begin upload -> in-memory run -> History
+uploading -> finalizing -> queued -> processing -> completed
+uploading -> cancelled
+seeded processing failure -> retry -> queued -> processing -> completed
+```
+
+The shell advances active runs every 1.3 seconds, adding 8 percentage points per uploading tick. Queued/processing each advance on a subsequent tick; these are illustrative timings. All completed runs use the same sample text. Cancellation is available during uploading; finalizing currently has no separate cancel action. No bytes are read/transmitted. Reload resets runs, page, form and mock identity; the preview starts signed in on History with three completed runs and one failed run. Sign-out cancels uploading/finalizing runs after confirmation, hides details, and pauses other simulation until sign-in. This differs deliberately from the future independent backend worker.
+
+A **run** represents one submission and its saved options. In M2 create a stable Run ID before bytes transfer, distinguish run/upload state from processing job state, and retain run identity/options on processing retry. A future re-run with different options creates a new run. Exact upload-retry/cancel routes and run DTO shapes remain to be settled before M2 coding.
+
+## M1 — UI requirements and coverage
+
+“Implemented” below means present in source, not a claim of completed browser/accessibility certification.
+
+| ID | Requirement / acceptance criteria | Current coverage |
 |---|---|---|
-| UI-01 | P0 / M1 | Show a persistent “Local demo — no real transcription” notice. Offer mock sign-in as a fixed development identity, display that identity after sign-in, and return to sign-in on sign-out. Signed-out users do not see recording details. All of this is clearly presentation-only in M1. |
-| UI-02 | P0 / M1 | Dashboard lists filename, uploaded date, human-readable size, and text-labeled `queued`, `processing`, `completed`, `failed` status. Fixtures cover every status. Each row/card opens the corresponding detail; failed records offer retry without losing filename/context. |
-| UI-03 | P0 / M1 | Provide a labeled single-file picker, visible format/size guidance, selected-file summary and explicit submit action. Show validation, pending, simulated queued confirmation and failure states. Disable duplicate submission while pending. State that preview files are not uploaded or saved; never report successful persistence. |
-| UI-04 | P0 / M1 | Completed detail shows filename, metadata and a readable, read-only transcript with an explicit sample-result label. Incomplete detail shows status instead of invented transcript content; failed detail gives a helpful message and retry action. Back navigation returns to the dashboard. Optional speaker labels/timestamps must be labeled sample formatting. |
-| UI-05 | P0 / M1 | Make loading, empty list, unavailable/error with retry, missing recording, not-yet-complete transcript, upload validation/error, and retry-pending states independently reproducible through temporary preview scenarios. Empty list offers upload; unavailable state does not masquerade as empty. |
-| UI-06 | P0 / M1 | At 320px and desktop widths, controls and transcript remain usable without page-wide horizontal scrolling; narrow screens may use recording cards rather than a squeezed table. Long filenames wrap/truncate accessibly without hiding the full name from assistive technology. |
-| UI-07 | P0 / M1 | Use semantic headings, buttons, labeled inputs and table headers where applicable. Keyboard users can sign in, choose/submit a file, open details, retry, go back and sign out with visible focus and no trap. Navigation moves focus meaningfully; modal use, if any, includes focus return. Status is not color-only; normal text contrast is at least 4.5:1. Announce significant asynchronous results/errors without announcing every poll. Validation is associated with the input; motion respects reduced-motion preferences. |
-| UI-08 | P0 / M1 | Keep typed fixtures and preview behavior outside presentation components behind an explicit temporary data boundary. A developer can select all required scenarios without changing component markup. Fixtures are neither authoritative storage nor a hidden API fallback; label preview mode and document that reload may reset it. |
+| UI-01 | Clear local-demo/no-real-transcription notice; fixed-user sign-in/out; hide records signed out; persistent shell, logo/title and sign-out. | Implemented. Starts signed in for easier review, not a secure session. |
+| UI-02 | History includes Run ID, metadata, requested speakers/settings, uploading/finalizing/queued/processing/completed/failed/cancelled states and open/retry/cancel actions as appropriate. | Implemented. Three completed and one failed fixture; active states follow Begin upload/retry. |
+| UI-03 | Dedicated Upload page validates file choice/size/format, saves options in preview memory, starts a labeled simulated run and navigates immediately to History. No persistence claims; prevent duplicate pending submission. | Implemented navigation/validation/simulation; page unmounts on successful submit. No actual transfer-failure scenario or server-pending submission yet. |
+| UI-04 | Read-only labeled sample transcript for completed runs; incomplete state instead of fabricated completion; error/retry and Back to History. | Implemented. Shared sample text; timestamps/labels honor display toggles, not recording content. |
+| UI-05 | Independently reproduce loading, empty, unavailable/error recovery, missing run, incomplete transcript, upload failure/validation and retry-pending states. | Partial. Selector supports normal/empty/error; refresh simulates loading for 1.5 seconds. Upload/retry exercises active states; missing-run fallback exists but has no scenario control. Explicit upload-failure and retry-failure controls remain. |
+| UI-06 | At 320px and desktop widths, shell/form/details are usable without page-wide overflow; full long filenames remain accessible. | Responsive styles and scrollable table implemented; visual review pending. Cards are optional, not required. |
+| UI-07 | Keyboard operation, meaningful focus, semantic headings/controls, associated errors, contrast ≥4.5:1, status not color-only, restrained announcements and reduced-motion support. | Labels, table headers, skip link, focus styles, notice/error live regions and reduced-motion CSS exist. Main receives focus on page change. Return-to-origin focus, complete announcements and full keyboard/contrast review remain acceptance work. |
+| UI-08 | Keep typed sample data/transition logic outside presentation markup; explicitly label preview; no hidden API fallback. All required scenarios selectable without editing markup. | Fixtures/transition helper separated in `preview.ts`; shell owns timer/state. No async source/API seam yet; not all scenarios selectable. |
+| UI-09 | SSScribe/navy branding and accessible dark-mode toggle across signed-in/out surfaces; persist theme only if browser storage permits. | Implemented. Cross-theme browser/contrast checks pending. |
 
-**M1 acceptance gate:** demonstrate UI-01–UI-08 using preview scenarios without a backend. Complete a keyboard-only walkthrough and narrow/desktop layout review; run `pnpm lint` and `pnpm build`. Record UI issues before starting connected behavior. Passing M1 does not mean a file was stored or transcribed.
+**M1 gate:** demonstrate UI-01–UI-09 with FastAPI stopped, close the listed gaps or explicitly agree on deferrals, complete keyboard/narrow/desktop/light/dark review, run `pnpm lint`/`pnpm build`, and obtain UI approval before M2. No committed automated app suite or `pnpm test` command exists; practical interaction tests are planned.
 
-## M2 requirements — connected local MVP
+## M2 — connected local MVP requirements (not implemented)
 
-### API and mock authentication
+### API and authentication
 
-| ID | Priority | Requirement and acceptance criteria |
-|---|---|---|
-| API-01 | P0 / M2 | Keep all browser backend calls in a small typed client using `/api`. Use Pydantic request/response models, stable opaque IDs, UTC timestamps and predictable JSON errors (proposed shape: `{"error":{"code":"…","message":"…"}}`). Invalid requests, missing records and state conflicts are distinguishable; network errors preserve useful context and offer retry. Preserve the existing health response. |
-| AUTH-01 | P0 / M2 | A clearly named mock auth adapter supplies one fixed development identity. Provide sign-in, current-user and sign-out behavior; proposed routes are `POST /api/auth/sign-in`, `GET /api/auth/me`, `POST /api/auth/sign-out`. A simple local session is sufficient, not OAuth. File/upload/transcript/retry routes require that mock session and return 401 when signed out. Refresh restores an active session; sign-out clears displayed user data and stops polling without deleting persisted recordings. This is not production authorization or multi-tenant isolation. |
-| API-02 | P0 / M2 | Implement the route contracts below and document final JSON shapes in FastAPI OpenAPI. Frontend does not read SQLite or local storage directly and never manufactures authoritative job states/transcripts. Unavailable backend shows an error, not fixture records. |
+| ID | Acceptance criteria |
+|---|---|
+| API-01 | Small typed `/api` client, Pydantic request/response models, stable IDs, UTC timestamps, predictable JSON errors. Proposed envelope: `{"error":{"code":"…","message":"…"}}`. Preserve public health response. No frontend fallback fixtures on error. |
+| AUTH-01 | Fixed-user mock auth adapter with sign-in/me/sign-out (proposed `/api/auth/sign-in`, `/api/auth/me`, `/api/auth/sign-out`). Protect recording/upload/transcript/retry/cancel operations with 401 when signed out. Refresh restores active session; sign-out clears protected UI and stops polling without deleting records. Warn/cancel active transfer on sign-out; already queued backend work continues. Not production authorization. |
+| API-02 | Implement/document read, authorization, streamed transfer, completion and retry contracts in OpenAPI. Include stable Run ID, saved options and upload state so unfinished submissions are visible. Internal storage keys/paths and external service IDs are never public DTO fields. |
 
-Required route behavior (proposed status codes to adopt consistently):
+Only health below exists. Other routes/status codes are proposals to finalize consistently with run-aware History:
 
-| Method and route | Success | Expected failures / contract |
-|---|---|---|
-| `GET /api/health` | 200, existing health JSON | Public local health check. |
-| `GET /api/files` | 200, list including file metadata and current job status | Empty list is a successful response. |
-| `GET /api/files/{file_id}` | 200, file metadata and current job state | 404 for unknown ID. |
-| `GET /api/files/{file_id}/transcript` | 200, stored transcript text, ID and creation time | 404 unknown file; 409 if known but not completed. |
-| `POST /api/uploads/authorize` | 201, upload ID, local transport/method, upload URL and constraints | Validate proposed filename/type/size. Response explicitly identifies local storage, never an Azure SAS. |
-| `PUT /api/dev/uploads/{upload_id}` (proposed development transport) | 204, bytes stored locally | Unknown authorization: 404; invalid format: 415; over limit: 413. Check actual received bytes, not just claimed size. |
-| `POST /api/uploads/complete` | 202, file ID and queued job | Require a successfully stored, validated upload. Reject absent/incomplete bytes with 409. Repeated confirmation returns the same file/job rather than duplicates. |
-| `POST /api/files/{file_id}/retry` | 202, same file and queued job state | 404 unknown file; 409 unless failed. Duplicate/concurrent retries must not create multiple active jobs. |
+| Method / route | Intended behavior |
+|---|---|
+| `GET /api/health` | Existing public 200 `{"status":"OK!"}`. |
+| `GET /api/files` | 200 list including run ID/options and incomplete uploads; may evolve to run-oriented read routes before integration. Empty is success, not unavailable. |
+| `GET /api/files/{file_id}` | 200 run/file state, 404 unknown. Model must allow pre-transfer records. |
+| `GET /api/files/{file_id}/transcript` | 200 stored text/ID/time, 404 unknown file, 409 known but not completed. |
+| `POST /api/uploads/authorize` | 201 creates persistent run/upload metadata before transfer; returns Run ID/upload ID, local transport URL/method and constraints. Save requested options. Not an Azure SAS. |
+| `PUT /api/dev/uploads/{upload_id}` | Proposed raw streaming transfer; 204 stored, 404 unknown authorization, 413 oversized, 415 unsupported type. Validate actual bytes/claimed length. |
+| `POST /api/uploads/complete` | 202 binds verified stored bytes to existing run/file and enqueues once. Missing/incomplete bytes: 409. Repeated confirmation returns same IDs/current state across restarts. |
+| `POST /api/files/{file_id}/retry` | 202 queues failed processing against same recording/options, 404 unknown, 409 wrong state/concurrent duplicate. |
+| Upload retry / cancel | Exact routes pending. Retry starts transfer from zero, may require reselection; cancel has an explicit persisted outcome and cleans partials. |
 
-The development upload route is a proposed local transport choice, not an implemented endpoint. Keep authorization/storage/confirmation behind replaceable interfaces so a future direct-to-Blob transport does not require changing presentation components. Final DTO details and local session mechanism can be settled before M2 implementation without expanding product scope.
+### Transfer and persistence
 
-### Upload and persistence
+| ID | Acceptance criteria |
+|---|---|
+| UP-01 | Enforce non-empty MP3/WAV and ≤4,000,000,000 actual bytes in browser/server. Proposed MIME policy: matching `audio/mpeg` or `audio/wav`/`audio/x-wav`; empty MIME may use permitted extension; reject contradictory non-empty MIME/metadata. This is not decoding/security scanning. Test exact boundary/one byte over without routine 4-GB allocation. |
+| UP-02 | Rudimentary single-request upload, streamed incrementally to safe generated temporary path; bounded memory, disk-write failure handling, actual-length checks, atomic storage finalization before queueing. No chunking, resume, parallel chunks or automatic retries. Clean partials/abandoned objects and recover stale uploading runs without expiring healthy slow transfers. Never expose storage paths. |
+| UP-03 | Shell-level upload manager survives internal page changes. Begin creates run, starts transfer and navigates to History. Show measured bytes/percentage, then finalizing until server confirmation; no invented processing percentage/ETA. Best-effort leave warning; refresh/close/network loss may interrupt and require full restart/reselection. Reconcile lost confirmation before resending. |
+| DATA-01 | SQLAlchemy/SQLite records for runs (stable ID, requested speakers/settings, lifecycle, failure stage), files (metadata, uploader, internal storage provider/object key), jobs (status, attempts, timestamps/error) and transcripts (run/file/job relationship, text/time). Persist readable text as SQLite `TEXT`; future Azure SQL uses `NVARCHAR(MAX)`. Save transcript/completion atomically. Actual bytes/results survive reload/restart. |
+| DATA-02 | Idempotently seed deterministic completed and retriable failed examples. Distinguish synthetic examples from actual uploads and sample results from audio analysis. Browser fixtures are not database seeds. |
+| DATA-03 | Add ignored DB/upload/partial/sidecar paths before generating local persistence; never commit data, secrets, venvs, dependencies or build output. Current `.gitignore` lacks application-data exclusions. |
 
-**Proposed MVP upload policy:** one non-empty file per submission; `.mp3` (`audio/mpeg`) or `.wav` (`audio/wav`, with `audio/x-wav` accepted as an alias); maximum **25 MiB (26,214,400 bytes)** inclusive. This is a proposed default to confirm before M1 upload work, not an existing capability. If revised, change this single policy and align UI guidance, picker, API validation and tests together. Browser MIME may be absent: document a consistent extension/MIME fallback policy before implementation; do not claim deep audio validation or decoding.
+Proposed paths: `backend/data/app.db`, `backend/data/uploads/`. No such store, seed/reset/cleanup command or disk quota mechanism is implemented yet. Define these in README when delivered. Object keys are durable references, not expiring SAS URLs. Optional future raw result JSON/export artifacts may live in Blob Storage with SQL references; no separate transcript file is needed initially.
 
-| ID | Priority | Requirement and acceptance criteria |
-|---|---|---|
-| UP-01 | P0 / M2 | Validate the chosen policy in browser and authoritatively on server, including empty files and actual size limits. Reject unsupported types and contradictory supplied metadata with actionable errors. The picker is a convenience, not the validation boundary. Test the size boundary and one byte over it. |
-| UP-02 | P0 / M2 | Transfer actual bytes and persist them through a local file storage adapter before confirming/enqueuing. Use generated safe object paths, not user filenames as paths; do not expose absolute paths in public DTOs. On failure show a recoverable error and do not falsely create a queued recording. Reject or clean up partial/invalid uploads; document cleanup of abandoned authorizations/files. |
-| UP-03 | P0 / M2 | Distinguish byte transfer from queued/processing work. Use measured upload progress only if available, otherwise an indeterminate pending indicator. Never invent transcription percentages or ETAs. A successful confirmation refreshes/selects the returned server record. |
-| DATA-01 | P0 / M2 | Persist through SQLAlchemy/SQLite: files (ID, filename, content type, actual size, local object path, uploader, created timestamp); jobs (ID, file ID, status, attempts, timestamps, error); transcripts (ID, file/job reference, text, optional original mock JSON, created timestamp). Reload and backend restart retain uploaded bytes, records and completed results. Keep schema setup proportional; no production migration system is required. |
-| DATA-02 | P0 / M2 | Seed a small deterministic first-run demonstration including a readable completed example and a retriable failure. Restarting does not duplicate seed records. Clearly distinguish synthetic examples from user uploads; fake results must not imply analysis of uploaded content. |
-| DATA-03 | P0 / M2 | Exclude SQLite DBs, uploaded/partial files, secrets, venvs, dependencies and builds from Git. Current ignore rules do not yet cover database/upload paths; add those exclusions when implementing persistence. Only store local data needed for the prototype. |
+### Jobs, integration, quality
 
-### Job simulation and integration
+| ID | Acceptance criteria |
+|---|---|
+| JOB-01 | Durable asynchronous queued→processing→completed/failed with one lightweight local runner, not blocking request handlers. Processing states remain separate from uploading/finalizing/cancelled run states. Claim once, save result or useful error. No Redis/Celery. |
+| JOB-02 | Deterministic sample output; documented failed example succeeds on retry. Retry preserves run/file/options, clears stale errors and increments processing attempts consistently. Proposed M2 accounting counts started attempts, unlike current illustrative browser accounting. |
+| JOB-03 | Single-process worker with documented limitations, clean shutdown/startup recovery of interrupted processing/queued jobs, no lost files or duplicate transcripts. Work continues after browser sign-out/closure. |
+| INT-01 | Replace preview state with backend authority. Conservative non-overlapping polling (proposed 3 seconds) while signed in with active runs, including uploads; stop when unnecessary/sign-out/unmount. Preserve selection; ignore stale responses. No hidden fixture fallback. |
+| QA-01 | Tests for auth/contracts, actual streamed bytes, validation, interruption/cancel/cleanup, idempotent complete/retry, transitions/recovery, seeds and restart persistence. Isolate temp DB/storage, use controlled clocks and synthetic streams/small injected limits. UI coverage for navigation, upload/retry/errors, themes and sign-out races. Lint/build and manual walkthrough pass. |
+| DOC-01 | Document actual startup, storage/seed/reset/cleanup, failure/retry trigger, session behavior, upload policy, worker limitations and future Azure adapters; distinguish implemented behavior from proposals. |
 
-| ID | Priority | Requirement and acceptance criteria |
-|---|---|---|
-| JOB-01 | P0 / M2 | Persist asynchronous `queued → processing → completed` or `queued → processing → failed` transitions. Do not wait for fake transcription inside upload/complete requests. A lightweight local worker/periodic runner is enough; no Redis/Celery. Store sample output only on completion, persist errors on failure, and prevent concurrent processing of the same job. |
-| JOB-02 | P0 / M2 | Use deterministic sample output and an explicit, documented failure scenario that succeeds on retry (a seeded failure is sufficient). Retrying increments attempt accounting, clears stale error state for the new attempt and preserves file identity/bytes. Successful completion has a retrievable transcript. Document simulation timing; exact delays are not a product requirement. |
-| JOB-03 | P0 / M2 | Document and test single-process worker limitations and restart recovery. On startup recover interrupted `processing` jobs to a runnable state, without losing files or producing duplicate transcripts; resume queued work. Multiple backend processes are not required. |
-| INT-01 | P0 / M2 | Replace M1 fixtures with API-backed behavior for every existing UI state. Poll conservatively (proposed every 3 seconds) while jobs are queued/processing, avoid overlapping requests, and stop when no jobs are active or the user signs out/unmounts. Handle request failures and stale responses without resetting selection or showing another file's transcript. |
-| QA-01 | P0 / M2 | Add targeted API tests for auth, validation/error contracts, actual upload persistence, confirmation/retry duplicate handling, job transitions, transcript availability, seed idempotency and restart recovery. Add practical UI interaction tests for sign-in, upload errors/success, detail selection and retry; use isolated temporary storage in backend tests. Frontend lint/build and a complete local walkthrough must pass. |
-| DOC-01 | P0 / M2 | Update README with actual startup, seed/reset procedure, storage paths, upload policy, failure/retry trigger, mock session behavior, worker limitations and future Azure adapter replacements. Describe implemented behavior separately from proposals. No credentials required. |
+**M2 gate:** start Vite/FastAPI, sign in, view examples, start transfer and see History before completion, navigate internally without abort, verify finalizing/queued/processing/completed and stored sample transcript, retry failure and cancel upload. Reject invalid/oversized data and signed-out calls. Verify interruptions, missing/incomplete records, API outage (no fixtures), reload/restart persistence, idempotent seeds and recovery. Recheck M1 accessibility/themes with network-driven state. A 4 GB policy in today's picker is not proof that this future transport supports 4 GB end to end.
 
-**M2 acceptance gate:** start Vite (5173) and FastAPI (8000) using the documented commands. Sign in, view seeded examples, upload an allowed audio file, observe queued/processing/completed states, read its labeled sample transcript, retry the deterministic failed example and observe completion. Verify signed-out API rejection, unsupported/oversized upload rejection, missing/incomplete detail handling and backend-unavailable recovery. Reload and restart FastAPI: uploaded bytes, metadata and completed transcript remain, seeds do not duplicate, interrupted jobs recover. Confirm connected mode never displays fallback fixture records. Repeat the M1 accessibility/responsive checks with live API states.
+## Production direction (not local milestone work)
 
-## P1 follow-ups (not milestone blockers)
+Keep adapter boundaries: local files → private Azure Blob Storage; SQLite → Azure SQL; mock identity → Entra; SQLite queue → Azure Queue Storage; fake inference → Azure transcription service. The future worker resolves private storage references, arranges supported service access, submits asynchronous work and stores internal external-job IDs to retrieve results. Do not add credentials, Azure SDKs or live integrations now.
 
-| ID | Priority | Requirement and acceptance criteria |
-|---|---|---|
-| NEXT-01 | P1 / after M2 | Filename search/status filters distinguish “no matches” from “no recordings” and can be cleared. |
-| NEXT-02 | P1 / after M2 | Copy transcript and plain-text download use the retrieved transcript, report failures and do not fabricate content. |
-| NEXT-03 | P1 / after M2 | Transcript search highlights/navigates matches without changing the stored transcript. |
+## P1 / deferred
 
-The [implementation plan](IMPLEMENTATION_PLAN.md) provides small UI-first delivery steps, an explicit UI approval gate and staged backend integration; this document sets behavior and acceptance gates rather than prescribing that task-by-task sequence.
+- **NEXT-01:** filename search/status filters with distinct no-match versus empty states.
+- **NEXT-02:** copy/plain-text download of retrieved transcript, with failure feedback.
+- **NEXT-03:** search within transcript without editing stored text.
+- Defer playback/waveforms/synchronization, transcript editing/versioning, real diarization, translation/subtitles, summaries/chat, meeting bots, collaboration/public sharing, integrations, billing and quotas.

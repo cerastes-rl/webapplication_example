@@ -1,10 +1,24 @@
-# Incremental implementation plan
+# SSScribe incremental implementation plan
 
 ## Scope and baseline
 
 This is a delivery plan, not a claim of implemented functionality. [Requirements](REQUIREMENTS.md) define acceptance; [UI research](UI_RESEARCH.md) informs presentation; [AGENTS.md](../AGENTS.md) supplies implementation constraints. Requirement IDs below refer to `REQUIREMENTS.md`.
 
-Inspection confirms a React 19/TypeScript/Vite starter, plain CSS and Oxlint, plus `backend/main.py` with only `GET /api/health` (`{"status":"OK!"}`). There are no app tests, API client, auth, persistence or worker. `frontend/package.json` has `dev`, `build`, `lint`, `preview` scripts, **no test script**. Backend requirements contain FastAPI/Pydantic/Uvicorn but no SQLAlchemy or test client dependency. Existing `.gitignore` does not exclude application data yet.
+The **SSScribe frontend preview is implemented for review**, using React 19/TypeScript/Vite, plain CSS, Oxlint, navy-blue accents and light/dark themes. It has a persistent shell, Upload/History navigation, run details, a mock identity and browser-only lifecycle simulation. It starts signed in on History; no file bytes are read or transferred. `backend/main.py` still only exposes `GET /api/health` (`{"status":"OK!"}`). There is no typed API client, backend auth, persistence, seeding or worker. `frontend/package.json` has `dev`, `build`, `lint`, `preview`, **no test script**; no committed automated application suite exists. Backend requirements lack SQLAlchemy/TestClient tooling. Existing `.gitignore` still needs application-data exclusions before persistence is generated.
+
+### Progress and immediate next work
+
+| Stage | Current state |
+|---|---|
+| Steps 1–2: shell/History and details | Implemented in `src/App.tsx` and `src/components.tsx`; browser/focus review pending. |
+| Step 3: preview interactions | Upload/options, mock sign-in/out, cancel, processing retry and shared timer implemented; fixtures/transitions are in `src/preview.ts`. Not yet the proposed async data-source abstraction. |
+| Theme/branding | SSScribe, navy accents and top-bar dark-mode toggle implemented. Theme tokens live in `src/index.css`; preference uses localStorage key `ssscribe-theme`, falling back initially to system preference. |
+| Step 4: acceptance | Lint/build and ad hoc lifecycle assertions have passed. Browser/light/dark/accessibility review, committed interaction tests and complete scenario controls remain. UI approval has not been recorded. |
+| Steps 5–10 | Planned only; do not start backend integration before UI approval. |
+
+Current scenario controls cover normal/empty/error History and a 1.5-second loading state. Begin upload/retry exposes active states; there is no dedicated missing-run, upload-failure or retry-failure selector. The History table scrolls locally on narrow screens. Focus moves to main on navigation, not back to the originating row. These are review/gap items, not claims of finished acceptance. See the [frontend guide](../frontend/README.md) for the reproducible walkthrough.
+
+The detailed slices below retain their original incremental intent. Proposed paths/refactors are future suggestions where they differ from the actual files listed above; do not create unnecessary new modules just to match the original sketch.
 
 Keep pnpm, the Python `backend/.venv` and requirements workflow, React StrictMode, and the current Vite `/api` proxy to `http://localhost:8000`. Keep ports 5173/8000 and `main:app` startup compatibility. No separate Node server, large UI/state framework, cloud calls or orchestration. Proposed paths are suggestions, not a mandate to build every abstraction up front. Each numbered step should be a small independently reviewable change; split larger steps into tests/service/UI commits if needed.
 
@@ -12,18 +26,18 @@ Keep pnpm, the Python `backend/.venv` and requirements workflow, React StrictMod
 
 ## Resolved product and architecture decisions
 
-The following summarizes decisions reached after the initial plan was written. They describe the target, not implemented behavior, and supersede conflicting older proposals in this plan and the initial requirements/research documents. In particular, the earlier 25 MiB limit, inline dashboard upload form, and omission of uploading runs from History are obsolete. Synchronize those companion documents before implementation; unchanged requirement IDs below remain traceability references, not approval of obsolete details.
+The following records resolved product decisions, aligned with the requirements and UI research. Shell/navigation/themes and simulated interactions are implemented as noted above; real transfer, SQL persistence and worker behavior remain targets. Requirement IDs link to current acceptance criteria, not a claim that all criteria pass.
 
 ### Application shell and site map
 
-The signed-in application has a persistent top banner and left navigation panel. The banner contains the logo at the far left, application title, local-demo indicator, current identity, and a sign-out button at the far right. Sign-out remains available on Upload, History and run details; it is not shown as an authenticated action on the sign-in screen. The sidebar has exactly two primary destinations: **Upload** and **History**, with a visible active-page indication. On narrow screens, navigation may collapse/reflow while remaining accessible.
+The signed-in application has a persistent top banner and left navigation panel. The banner contains the logo at the far left, SSScribe title, dark-mode toggle, local-demo indicator, current identity, and a sign-out button at the far right. Use navy accents with theme tokens for every surface/control. The theme toggle also remains available on sign-in, remembers preference when storage is available, and does not persist run data. Sign-out remains available on Upload, History and run details; it is not shown as an authenticated action on the sign-in screen. The sidebar has exactly two primary destinations: **Upload** and **History**, with a visible active-page indication. On narrow screens, navigation may collapse/reflow while remaining accessible.
 
 ```text
 Sign-in
     |
     v
 Signed-in application shell
-|--- Top banner: logo | title | local demo | user | Sign out
+|--- Top banner: logo | SSScribe | Dark mode | local demo | user | Sign out
 |--- Sidebar
 |    |--- Upload
 |    |--- History
@@ -44,9 +58,9 @@ Signed-in application shell
      |--- Appropriate retry action and Back to History
 ```
 
-Upload collects the file, requested speaker count and settings before submission. Proposed first controls are unknown/automatic versus a positive speaker count, language (default English), speaker labels and timestamps; exact ranges, supported choices and defaults still need confirmation. Save selected options even though local transcription is simulated. Do not imply that options cause genuine diarization, timing or language recognition in the mock.
+Upload collects the file, requested speaker count and settings before submission. Current controls are Unknown/Automatic (default) or 1–10 speakers, English only, and speaker labels/timestamps (both default on). Future service support and allowed ranges need validation during integration. Save selected options even though local transcription is simulated. Do not imply that options cause genuine diarization, timing or language recognition in the mock.
 
-History includes **all runs**, not just completed uploads. Desktop columns are Run ID, filename, submitted date/time, size, requested speaker count, settings (individual columns where space permits), status and actions. Show a shortened Run ID with full value available in details; internal storage locations are never columns. Narrow layouts can use cards or place settings in details. Loading, empty, unavailable and no-longer-found states remain distinct. Run details expose full ID, requested settings, relevant timestamps, attempt count and helpful failure information. Search/filter/pagination and transcript copy/download remain later improvements.
+History includes **all runs**, not just completed uploads. Desktop columns are Run ID, filename, submitted date/time, size, requested speaker count, settings (individual columns where space permits), status and actions. Current preview shows its complete short Run ID in the combined filename/ID column and details. Future longer stable IDs may be shortened in the table with full value in details; internal storage locations are never columns. Narrow layouts can use cards or place settings in details. Loading, empty, unavailable and no-longer-found states remain distinct. Run details expose full ID, requested settings, relevant timestamps, attempt count and helpful failure information. Search/filter/pagination and transcript copy/download remain later improvements.
 
 ### Run identity, lifecycle and navigation
 
@@ -66,11 +80,11 @@ Begin upload -> create run -> start transfer -> navigate to History
                             failures -> Failed + failure stage
 ```
 
-`uploading` is a run/upload state, not a transcription job state. Keep job states `queued`, `processing`, `completed`, `failed`; add a public run/upload state and `failure_stage` to distinguish transfer from processing failures. Finalizing may be a transient UI/upload stage, not a new job state. Cancellation must have an explicit display outcome (recommended `cancelled`) rather than silently removing the row; finalize its DTO spelling before coding.
+`uploading` is a run/upload state, not a transcription job state. Keep job states `queued`, `processing`, `completed`, `failed`; add a public run/upload state and `failure_stage` to distinguish transfer from processing failures. Finalizing may be a transient UI/upload stage, not a new job state. The preview already represents cancellation as `cancelled` and finalizing as `finalizing`; keep explicit outcomes in the eventual run DTO rather than silently removing rows. Its single browser `Run` type combines stages for presentation; M2 must introduce persisted upload/job distinctions and failure stage.
 
 ### Rudimentary large-file upload policy
 
-- **Maximum file size: 4 GB.** Use the proposed precise decimal definition of **4,000,000,000 bytes**, inclusive, consistently in UI, server and tests; confirm this byte convention before implementation. This replaces the old 26,214,400-byte proposal. File formats remain the proposed MP3/WAV allowlist until confirmed.
+- **Maximum file size: 4 GB (4,000,000,000 bytes inclusive).** The current picker enforces this decimal limit and a non-empty MP3/WAV extension allowlist. M2 must enforce the same limit on actual received bytes. Browser validation alone does not establish real 4 GB transfer support.
 - Start with one single-request transfer per upload. No chunking, resume, parallel chunks or automatic retry. An interrupted transfer restarts from byte zero; after reload the user may need to select the file again.
 - A shared upload manager in the persistent application shell owns the request and selected `File`, not the Upload page. Internal navigation to History or details must not abort it. Once the run is created and transfer starts, navigate to History and show it there.
 - Use measured browser upload progress (e.g. XMLHttpRequest upload events), showing percentage and transferred/total bytes. Do not buffer the whole file in JavaScript. At 100% bytes sent, show finalizing until the backend confirms storage; sent bytes alone do not mean a durable queued recording. Preview-mode progress is explicitly simulated.
@@ -81,7 +95,7 @@ Begin upload -> create run -> start transfer -> navigate to History
 
 ### Storage boundaries: local now, Azure later
 
-| Responsibility | Current local implementation | Eventual production equivalent |
+| Responsibility | Planned connected local implementation (not present today) | Eventual production equivalent |
 |---|---|---|
 | Metadata/run state | SQLite through SQLAlchemy | Azure SQL / SQL Server |
 | Audio bytes | Local filesystem storage adapter | Private Azure Blob Storage |
@@ -91,7 +105,7 @@ Begin upload -> create run -> start transfer -> navigate to History
 
 Store `storage_provider` and an object key/reference in SQL. Configuration resolves that key to a local root or Blob container; do not use original filenames as filesystem paths. Storage locations and service job IDs are backend-only metadata, excluded from History and public DTOs. Do not persist expiring SAS URLs as the durable identity of a recording or expose private storage credentials. In the local-only upload authorization response, a development upload URL is a transport endpoint, not disclosure of the underlying storage path or an Azure SAS.
 
-After upload verification, the worker resolves the stored recording reference and saved options and calls the transcription adapter. Locally it produces sample text unrelated to the uploaded audio. In production the adapter must use the chosen Azure API's supported mechanism for reading the private blob, submit work, persist the external job ID, and retrieve completion/results asynchronously. Authentication/access details and Azure product limits remain future integration decisions, not current cloud setup work.
+After upload verification, the worker resolves the stored recording reference and saved options and calls the transcription adapter. The future local fake adapter produces sample text unrelated to uploaded audio; today the browser simply renders a shared sample fixture. In production the adapter must use the chosen Azure API's supported mechanism for reading the private blob, submit work, persist the external job ID, and retrieve completion/results asynchronously. Authentication/access details and Azure product limits remain future integration decisions, not current cloud setup work.
 
 ### Transcript persistence decision
 
@@ -103,7 +117,7 @@ A future hybrid design may retain readable text in SQL while keeping the origina
 
 ### Delivery and acceptance implications
 
-The UI-first sequence and explicit approval gate remain unchanged. Build the shell and History layout, then run details, then the dedicated Upload page and simulated lifecycle before integrating the backend. Connected acceptance must additionally verify:
+The UI-first sequence and explicit approval gate remain unchanged. The shell, History, details and dedicated Upload page now exist; finish scenario gaps and browser review before integrating the backend. Connected acceptance must additionally verify:
 
 - Begin upload creates a visible run before bytes finish transferring; selected options persist and are displayed correctly.
 - Upload continues across internal navigation; progress is measured in connected mode and finalizing is distinct from queued.
@@ -111,48 +125,48 @@ The UI-first sequence and explicit approval gate remain unchanged. Build the she
 - Interruption, cancellation, disk failure and restart produce recoverable states with partial-file cleanup; retry begins at zero. Healthy slow transfers are not falsely expired.
 - Storage paths/keys and external service identifiers stay out of user-facing responses; completed sample text persists in SQL and survives restarts.
 
-## 1. First visible slice: static recordings dashboard
+## 1. First visible slice: static recordings dashboard — implemented for review
 
 **Requirements:** initial UI-01 notice, UI-02, UI-06–UI-08 (partial, not M1 completion).
 
-- Replace starter content in `frontend/src/App.tsx`, `App.css`, `index.css` with the persistent logo/title/user/sign-out banner, Upload/History sidebar, “Local demo — no real transcription” notice and History list. Begin with a display-only development identity marked as preview, not a sign-in state machine.
-- Suggested additions: `src/types/recordings.ts`, `src/preview/fixtures.ts`, `src/components/RecordingsDashboard.tsx`, `StatusBadge.tsx`. Keep a few typed examples outside JSX, covering uploading plus all four job statuses and a long filename. Include Run ID, filename, date, human-readable size, requested speakers/settings and text-labeled status; do not add upload or retry behavior yet.
-- Use semantic table headings on desktop or labeled cards on narrow screens; normal CSS and native controls suffice. No router, component library or API dependency required.
+- Delivered in `frontend/src/App.tsx`, `App.css`, `index.css`: persistent SSScribe/theme/user/sign-out banner, Upload/History navigation, explicit preview/no-real-transcription notice and History. Mock sign-in/out is now implemented too.
+- Typed examples live in `src/preview.ts`; `StatusBadge` and shared visuals are in `src/components.tsx`, rather than the originally suggested separate component/type directories. History includes Run ID, filename, date, size, requested speakers/settings and statuses. Upload/retry now exercises the active states.
+- Semantic table headers and native controls are implemented; narrow History uses local horizontal scrolling rather than cards. No router, component library or API dependency was introduced. Review long filenames, responsive layout and keyboard operation before accepting this slice.
 
 **Deliverable/test:** dashboard viewable with only Vite running. Review at 320px and desktop, long-name rendering, status text, headings and focus styles; run lint/build. **Gate:** agree on the list hierarchy and spacing before adding more state. This slice deliberately does not satisfy all UI-01/UI-02 interactions.
 
-## 2. Small read-only transcript slice
+## 2. Small read-only transcript slice — implemented for review
 
 **Requirements:** UI-02 detail navigation, UI-04, UI-06–UI-08.
 
-- Add `src/components/TranscriptDetail.tsx`; keep selection as an ID in `App.tsx`. A simple dashboard/detail view switch is enough; deep-link routing is not required.
-- Completed example opens filename, metadata and readable, read-only text labeled “Sample result — not derived from audio.” Incomplete examples show their actual fixture status without transcript text; failed detail preserves filename/error context. Add back navigation, but defer active retry until step 3.
-- Use a separate typed transcript fixture keyed by file ID. Restore focus to the originating Open button on back; move focus to the detail heading when opening.
+- Delivered as `RunDetail` in `src/components.tsx`; selection is an ID in `App.tsx`. Navigation uses a page-state switch without deep links or browser history integration.
+- Completed details show metadata and readable sample text; incomplete views show state, and failed details offer retry. The shared sample transcript in `src/preview.ts` is intentionally the same for every run, unrelated to audio; settings only change its label/timestamp presentation.
+- Back navigation exists and main receives focus on page changes. Return-to-origin row focus and heading-specific focus remain review/follow-up items. Do not claim per-recording transcripts or audio recognition.
 
 **Deliverable/test:** keyboard open/back walkthrough for completed, queued, processing and failed examples; long transcript wraps without page-wide scrolling. Lint/build pass. **Gate:** review this minimal dashboard-to-document journey before adding auth/upload complexity.
 
-## 3. Complete presentation-only interactions in small slices
+## 3. Complete presentation-only interactions — implemented with remaining gaps
 
 **Requirements:** UI-01–UI-05, UI-08; continue UI-06/UI-07.
 
 Implement these as separate reviewable changes, not one large screen rewrite:
 
-1. **Preview boundary/scenarios:** introduce `src/data/recordingsSource.ts` and `src/preview/previewSource.ts`, `scenarios.ts`. Move fixture access out of presentation components; select scenarios through an explicit development-only preview selector or documented URL option. Include normal, loading, empty, unavailable, missing file and incomplete transcript scenarios. Unavailable must not render as an empty list.
-2. **Mock sign-in preview:** add `src/components/SignIn.tsx` and simple signed-in/signed-out presentation state. Display a fixed identity; signed-out views hide details. Sign-out clears selection and pending preview timers. Label this presentation-only, not secure authentication.
-3. **Upload preview:** add a dedicated Upload page with `src/components/UploadForm.tsx` and a small shared policy module. Include requested speaker count/settings and the resolved 4 GB maximum, with the byte convention and remaining format choices confirmed before coding. Begin upload creates a preview run, starts explicitly simulated progress and navigates to History, where uploading/finalizing/queued and failure/cancellation scenarios are visible. Disable duplicate submission. Say explicitly “Preview only — file not uploaded or saved”; reload may reset everything. Do not send bytes or claim persistence. Empty state offers access to this form.
-4. **Retry preview:** failed list/detail actions preserve context, expose pending and failure/success scenarios, and prevent duplicates. All simulated transitions belong in the preview source, not component timers.
+1. **Preview boundary/scenarios:** fixtures/transitions are already separated in `src/preview.ts`; `App.tsx` owns the timer/state and normal/empty/error selector. Add explicit missing-run, upload-failure and retry-failure controls if needed to close UI-05. The proposed async source interface is a future integration seam, not an existing module. Keep unavailable distinct from empty.
+2. **Mock sign-in preview:** implemented inline in `App.tsx`, with a fixed identity, hidden signed-out details and clear mock labeling. Sign-out clears selection, confirms/cancels uploading/finalizing runs and pauses the remaining timer; sign-in resumes queued/processing simulation. Backend-independent execution is future M2 behavior, not today's browser behavior.
+3. **Upload preview:** implemented as `UploadPage` in `src/components.tsx`, with policy constant in `src/preview.ts`. Preserve the implemented speaker/settings controls and decimal 4 GB MP3/WAV policy. Begin upload creates a preview run, starts explicitly simulated progress and navigates to History, where uploading/finalizing/queued and failure/cancellation scenarios are visible. Disable duplicate submission. Say explicitly “Preview only — file not uploaded or saved”; reload may reset everything. Do not send bytes or claim persistence. Empty state offers access to this form.
+4. **Retry preview:** list/detail actions requeue the failed example, preserve run/options and remove stale error text. Transition logic is in `preview.ts`, driven by the shell timer. Repeated retry has no effect once queued. Explicit retry-failure scenario remains to be added; current retry always proceeds to completion.
 
-**Deliverable/test:** documented scenario names and how to select them without changing markup; every UI-05 state independently reproducible. Check absent/empty file, unsupported type, exact size boundary/one byte over, duplicate submission and sign-out during a pending simulation. Lint/build after each slice. **Gate:** all three surfaces work without FastAPI and every simulated action is visibly labeled.
+**Deliverable/test:** documented scenario names and how to select them without changing markup; every UI-05 state independently reproducible. Check absent/empty file, unsupported type, exact size boundary/one byte over, duplicate submission and sign-out during a pending simulation. Lint/build after each slice. **Gate:** sign-in, Upload, History and details work without FastAPI and every simulated action is visibly labeled.
 
 ## 4. Finish M1 scenarios and accessibility — STOP / UI approval gate
 
-**Requirements:** all UI-01–UI-08.
+**Requirements:** all UI-01–UI-09, including SSScribe/navy branding and the persisted light/dark theme preference.
 
 - Complete responsive styling and all preview error/retry states before adding any backend routes. Add focused interaction tests under `frontend/src/` for sign-in visibility, file validation/pending behavior, detail selection/back and retry. Recommended tooling, only when these tests are introduced: Vitest + React Testing Library + a DOM environment; add a documented `test` script then. Do not add a second linter or an end-to-end framework just to render the first slices.
 - Perform a keyboard-only journey through sign-in, picker/submit, list/detail, retry, back and sign-out. Verify meaningful focus, no traps, semantic controls/headings/labels, associated input errors, full accessible filenames, text status labels, contrast ≥4.5:1, reduced-motion support and restrained live announcements. Use the dedicated Upload page within the persistent shell rather than an upload modal.
-- Review 320px and desktop, long names/transcripts and every scenario. Loading, empty, unavailable and missing-file states must remain distinct. Record remaining issues and review evidence in the implementation PR/review notes; explain preview startup/scenario selection in README.
+- Review 320px and desktop, long names/transcripts and every scenario in both light and dark themes; verify the top-bar toggle on sign-in too. Loading, empty, unavailable and missing-file states must remain distinct. Record remaining issues and review evidence in the implementation PR/review notes; explain preview startup/scenario selection in README.
 
-**Acceptance gate:** lint/build and newly added focused tests pass; reviewer demonstrates UI-01–UI-08 with FastAPI stopped. **STOP: obtain explicit user/reviewer UI approval before step 5 or other connected/backend work.** Unresolved usability/accessibility issues are fixed here, not deferred until backend integration. M1 approval does not mean audio was uploaded, saved or transcribed.
+**Acceptance gate:** lint/build and newly added focused tests pass; reviewer demonstrates UI-01–UI-09 with FastAPI stopped. **STOP: obtain explicit user/reviewer UI approval before step 5 or other connected/backend work.** Unresolved usability/accessibility issues are fixed here, not deferred until backend integration. M1 approval does not mean audio was uploaded, saved or transcribed.
 
 ## Typed preview seam and recommended contracts
 
@@ -179,7 +193,7 @@ Settle only the read types needed for steps 1–2 initially. Expand at the relev
 | Upload authorization | Input `{filename, content_type, size_bytes, speaker_count, settings}`; persist a run before transfer; 201 → `{run_id, upload_id, transport: 'local', method: 'PUT', upload_url, constraints: {max_size_bytes, allowed_extensions}}`. URL is relative `/api/dev/uploads/{upload_id}`, not a SAS token; never expose paths. |
 | Byte transfer / completion | PUT stores bytes then returns 204. Complete input `{upload_id}` → 202 `{file: FileDto}` with queued job. Repeated confirmation returns the same IDs/current state, not a fresh queued claim. Retry → 202 `{file: FileDto}`, only from failed. |
 
-**Upload policy:** non-empty single file, maximum **4 GB** (proposed precise convention: ≤4,000,000,000 bytes); this supersedes the requirements' older 25 MiB proposal. The `.mp3`/`.wav` allowlist remains a recommendation to confirm. Normalize MIME case/parameters; allow `audio/mpeg`, `audio/wav` and `audio/x-wav` alias only with matching extension. If browser MIME is empty, infer from a permitted extension; reject contradictory non-empty MIME rather than silently overriding. Apply the same rules to authorization/actual transfer, check claimed versus received length, and reject empty/over-limit bytes. This is metadata validation, not audio decoding or a security scanner. Confirm and document policy once, then align UI/server tests. Synthetic seed records are marked examples, not purported uploaded audio.
+**Upload policy:** non-empty single `.mp3`/`.wav` file, maximum **4 GB (≤4,000,000,000 bytes)**, matching current UI checks. The following server MIME/metadata normalization is still a recommendation to implement; it is not performed by today's extension/size validator. Normalize MIME case/parameters; allow `audio/mpeg`, `audio/wav` and `audio/x-wav` alias only with matching extension. If browser MIME is empty, infer from a permitted extension; reject contradictory non-empty MIME rather than silently overriding. Apply the same rules to authorization/actual transfer, check claimed versus received length, and reject empty/over-limit bytes. This is metadata validation, not audio decoding or a security scanner. Confirm and document policy once, then align UI/server tests. Synthetic seed records are marked examples, not purported uploaded audio.
 
 ## 5. Short read-only FastAPI integration spike (after UI approval)
 
@@ -274,4 +288,4 @@ cd backend
 
 **Proposed test commands, only after adding the tooling/tests in steps 4–5:** `cd frontend && pnpm test --run` for the new Vitest script; `cd backend && .venv/bin/python -m unittest discover -s tests -v` for unittest/TestClient tests. Add `httpx` to the documented dev requirements and use isolated temporary DB/storage with worker timing controlled by tests. SQLAlchemy is a later runtime dependency; no multipart package is needed with the recommended raw PUT transport. Confirm package compatibility with the dev container's Python version when adding dependencies. Do not document nonexistent commands as currently available.
 
-During this planning change, run only documentation checks (`git diff --check` and file/diff review); no installs, application tests or servers are needed.
+For documentation-only updates, check links, source consistency and `git diff --check`; no dependency installs or server startup is needed. Existing lint/build checks are available, but proposed test commands above are not yet configured.
