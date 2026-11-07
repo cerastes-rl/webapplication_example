@@ -61,7 +61,7 @@ python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
 - FastAPI OpenAPI UI: http://localhost:8000/docs.
 - No auth/file/upload/run/transcript/job routes exist yet. SQLAlchemy is not in requirements.
 
-The dev container forwards 5173/8000. `.vscode/tasks.json` defines automatic startup tasks; `.devcontainer/start-dev.sh` also checks those ports before starting servers and writes logs under `.devcontainer/logs/`. Its backend dependency install runs only when creating a missing venv, so update an existing environment explicitly after requirements changes. The helper does not install frontend dependencies.
+The dev container forwards 5173/8000. On container creation, `postCreateCommand` creates or reuses `backend/.venv` and installs `backend/requirements.txt`. Run **Dev Containers: Rebuild Container** to apply this setup to an existing container; it does not run on every restart. After requirements change, rerun `backend/.venv/bin/python -m pip install -r backend/requirements.txt` from the repository root. `.vscode/tasks.json` defines automatic startup tasks; `.devcontainer/start-dev.sh` also checks those ports before starting servers and writes logs under `.devcontainer/logs/`. Its backend dependency install runs only when creating a missing venv, so update an existing environment explicitly after requirements changes. The helper does not install frontend dependencies.
 
 ## Repository layout
 
