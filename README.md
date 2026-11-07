@@ -4,6 +4,7 @@ SSScribe is currently a **frontend-only UI preview** for submitting recordings, 
 
 ## Documentation
 
+- [Project structure](docs/PROJECT_STRUCTURE.md): directory tree, file responsibilities, app flow and where to make common changes.
 - [Frontend guide](frontend/README.md): controls, preview scenarios, file boundaries and manual review checklist.
 - [Requirements](docs/REQUIREMENTS.md): current implementation coverage and connected-MVP acceptance criteria.
 - [Implementation plan](docs/IMPLEMENTATION_PLAN.md): resolved decisions, progress, review gate and future backend steps.
@@ -63,6 +64,8 @@ python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
 The dev container forwards 5173/8000. `.vscode/tasks.json` defines automatic startup tasks; `.devcontainer/start-dev.sh` also checks those ports before starting servers and writes logs under `.devcontainer/logs/`. Its backend dependency install runs only when creating a missing venv, so update an existing environment explicitly after requirements changes. The helper does not install frontend dependencies.
 
 ## Repository layout
+
+For the complete directory tree, configuration files, generated directories and a “where do I change this?” reference, see the [project structure guide](docs/PROJECT_STRUCTURE.md).
 
 ```text
 frontend/

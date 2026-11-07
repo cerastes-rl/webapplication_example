@@ -96,6 +96,14 @@ Use React + TypeScript with a clean, accessible interface, SSScribe branding, na
 - Maintain the existing Vite-to-FastAPI `/api` proxy and use the dev container's forwarded ports (5173 frontend, 8000 backend).
 - Do not break current functionality; add targeted tests for API behavior, job state transitions, and core UI interactions where practical.
 
+## Documentation maintenance
+
+- Review both root `README.md` and `docs/PROJECT_STRUCTURE.md` in the same change when adding, removing or moving files/directories, changing responsibilities, setup commands, dependencies, configuration, implemented behavior, architecture or persistence boundaries. Update each where affected; no no-op documentation edits are required when nothing relevant changed.
+- Keep the README overview, current capabilities and startup/check commands accurate. Link to the detailed [project-structure guide](docs/PROJECT_STRUCTURE.md) rather than duplicating its full tree.
+- Keep the project-structure guide grounded in actual maintained files: explain responsibilities/ownership, data flow and where to make common edits. Clearly separate ignored/generated files from maintained source, and label proposed, not-yet-existing structure separately.
+- Distinguish implemented behavior and tests from plans or pending validation; never claim planned features or tests are implemented.
+- Verify documented paths and local links against the repository, and run `git diff --check` before finishing.
+
 ## Connected-MVP definition of done (future gate)
 
 A developer can start the Vite and FastAPI servers and, entirely locally, sign in as a mock user, see example files, upload a file, observe its queued/processing/completed state, open a transcript, and retry a failed job. Reloading the page preserves records in SQLite. No Azure account or API credentials are required. Document startup commands, mock behavior, limitations, and future Azure replacement points in `README.md`.
