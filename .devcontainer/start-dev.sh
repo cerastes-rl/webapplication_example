@@ -1,6 +1,15 @@
 
 #!/usr/bin/env bash
 
+set -x
+
+echo "Startup script executed"
+echo "Current directory: $(pwd)"
+echo "Current user: $(whoami)"
+echo "Node location: $(command -v node)"
+echo "pnpm location: $(command -v pnpm)"
+echo "Python location: $(command -v python)"
+
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 LOGS="$ROOT/.devcontainer/logs"
 

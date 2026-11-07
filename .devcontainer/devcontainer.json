@@ -18,11 +18,10 @@
 
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	// "forwardPorts": [],
-	"forwardPorts": [5173, 8000],
+	"forwardPorts": [5173, 8000]
 
 	// Use 'postCreateCommand' to run commands after the container is created.
 	// "postCreateCommand": "pip3 install --user -r requirements.txt",
-	"postStartCommand": "bash -ic 'bash .devcontainer/start-dev.sh'",
 
 	// Configure tool-specific properties.
 	// "customizations": {},

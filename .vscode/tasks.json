@@ -1,0 +1,40 @@
+
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Start Vite",
+      "type": "shell",
+      "command": "pnpm dev --host 0.0.0.0 --port 5173 --strictPort",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "isBackground": true,
+      "problemMatcher": [],
+      "runOptions": {
+        "runOn": "folderOpen"
+      },
+      "presentation": {
+        "panel": "dedicated",
+        "reveal": "silent"
+      }
+    },
+    {
+      "label": "Start FastAPI",
+      "type": "shell",
+      "command": ".venv/bin/python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000",
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
+      "isBackground": true,
+      "problemMatcher": [],
+      "runOptions": {
+        "runOn": "folderOpen"
+      },
+      "presentation": {
+        "panel": "dedicated",
+        "reveal": "silent"
+      }
+    }
+  ]
+}
