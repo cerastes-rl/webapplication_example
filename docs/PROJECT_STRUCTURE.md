@@ -1,17 +1,17 @@
 # SSScribe project structure
 
-A guide to **what exists now**, where its responsibilities live, and where to make common changes. Start with the [root README](../README.md) for startup commands and current capabilities; use the [frontend guide](../frontend/README.md) for the preview walkthrough. Planned work is in the [implementation plan](IMPLEMENTATION_PLAN.md), not presented below as existing source.
+Maintained files, responsibilities and common editing locations. See [README](../README.md) for startup, [frontend guide](../frontend/README.md) for review and [implementation plan](IMPLEMENTATION_PLAN.md) for future work.
 
 ## Quick orientation
 
-- **`frontend/` is the working application UI.** React renders an explicitly labeled, in-memory preview. It never calls the backend or reads/transmits audio bytes.
-- **`backend/` is currently a health-only FastAPI application.** Database, storage, auth, upload and worker modules do not exist yet.
-- **`docs/` explains the product and implementation direction.** Documentation is not evidence that a planned feature has shipped.
-- Hidden directories such as `.devcontainer/`, `.vscode/` and `.github/` hold development and repository configuration, not application pages.
+- **`frontend/`:** React UI preview with in-memory runs and simulated progress.
+- **`backend/`:** FastAPI app exposing `GET /api/health`.
+- **`docs/`:** requirements, architecture, delivery plan and research.
+- **`.devcontainer/`, `.vscode/`, `.github/`:** development and repository configuration.
 
 ## Maintained files and directories
 
-Paths are relative to the repository root. Dependency internals, generated build output and Git internals are deliberately excluded from this tree.
+Paths are relative to the repository root.
 
 ```text
 SSScribe/                            Repository root (actual checkout name may differ)
@@ -20,7 +20,7 @@ SSScribe/                            Repository root (actual checkout name may d
 |--- .gitignore                      Repository-wide ignore rules
 |
 |--- frontend/                       React + TypeScript + Vite UI
-|    |--- README.md                  Preview usage, limitations and review checklist
+|    |--- README.md                  Preview usage, scenarios and review checklist
 |    |--- package.json               Dependencies and dev/build/lint/preview scripts
 |    |--- pnpm-lock.yaml             Resolved dependency versions; managed by pnpm
 |    |--- .gitignore                 Additional frontend-specific ignore rules
@@ -38,24 +38,26 @@ SSScribe/                            Repository root (actual checkout name may d
 |    |    |--- preview.ts            Types, fixtures, sample text and transition helper
 |    |    |--- index.css             Global defaults and light/dark theme tokens
 |    |    |--- App.css               Layout, component styles and responsive rules
-|    |    |--- assets/               Leftover starter assets (not used by current UI)
+|    |    |--- assets/               Starter image assets
 |    |         |--- hero.png
 |    |         |--- react.svg
 |    |         |--- vite.svg
 |    |
 |    |--- public/                    Static assets served without module imports
 |         |--- favicon.svg           Favicon referenced by index.html
-|         |--- icons.svg             Starter icon sprite; not used by current UI
+|         |--- icons.svg             Starter icon sprite
 |
 |--- backend/                        Python/FastAPI backend scaffold
-|    |--- main.py                    FastAPI app and GET /api/health only
+|    |--- main.py                    FastAPI app and GET /api/health
 |    |--- requirements.txt           Pinned Python runtime dependencies
 |
 |--- docs/                           Project documentation
 |    |--- PROJECT_STRUCTURE.md       This guide: paths, responsibilities and editing map
 |    |--- REQUIREMENTS.md            Behavior, coverage/gaps and acceptance criteria
-|    |--- IMPLEMENTATION_PLAN.md     Progress, architecture decisions and delivery steps
+|    |--- IMPLEMENTATION_PLAN.md     Progress, service/call table, Speech API flow, diagrams and steps
+|    |--- API_DATA_FLOW.md           Planned end-state call sequences, triggers, schedules and recovery
 |    |--- UI_RESEARCH.md             Public-product research and design rationale
+|    |--- notes.md                   Informal demo feedback
 |
 |--- .devcontainer/                  VS Code development-container configuration
 |    |--- devcontainer.json          Python image, Node/pnpm feature and forwarded ports
@@ -71,26 +73,24 @@ SSScribe/                            Repository root (actual checkout name may d
 
 ### Frontend responsibilities in more detail
 
-| File | What it owns | What it does not do |
-|---|---|---|
-| `src/main.tsx` | Imports global styles, finds `#root`, mounts React StrictMode and `App`. | Does not implement pages or backend startup. |
-| `src/App.tsx` | Top banner/sidebar, current page/selected run, mock identity, History table and summary cards, preview scenario/loading controls, notifications, theme selection, retry/cancel actions, shared lifecycle timer and best-effort leave warning. | No URL router, secure authentication, fetch/upload request or durable run store. |
-| `src/components.tsx` | `Icon`, `Brand`, `StatusBadge`, `EmptyState`, `UploadPage`, `RunDetail`. The Upload form owns its unsubmitted file choice/options and validation; details render sample text/options/status. | No audio analysis or storage adapter. The form only reads file metadata and hands a new preview run to `App`. |
-| `src/preview.ts` | `Run`/`Status` types, `MAX_FILE_SIZE`, four initial runs, shared sample transcript, size/date formatting and pure `advanceRuns` helper. | Not database seeds, an API client, an async data-source abstraction or an API-failure fallback. |
-| `src/index.css` | Base element styles, form/progress defaults, focus/reduced-motion rules and CSS custom properties for light/dark colors. | Does not decide the selected theme; `App` sets it. |
-| `src/App.css` | Header/sidebar/table/forms/details/sign-in layout, theme-toggle appearance, statuses and responsive breakpoints. Uses global theme tokens. | Does not control upload timing or page state. |
-
-`components.tsx` intentionally groups several small components. There is no `src/components/` directory or separate file for each page today. Split modules only when it improves readability or the next feature needs it; do not assume paths proposed in an earlier plan already exist.
+| File | Responsibility |
+|---|---|
+| `src/main.tsx` | Imports global styles and mounts `App` in React StrictMode. |
+| `src/App.tsx` | Banner/sidebar, navigation/selection, theme, mock identity, History, scenario/loading controls, notices, retry/cancel, lifecycle timer and leave warning. |
+| `src/components.tsx` | `Icon`, `Brand`, `StatusBadge`, `EmptyState`, `UploadPage`, `RunDetail`. Upload owns file/options/validation and passes a run to `App`. |
+| `src/preview.ts` | Run/status types, size limit, four fixtures, shared transcript, formatting and `advanceRuns`. |
+| `src/index.css` | Theme tokens, global styles, focus/reduced-motion rules and control defaults. |
+| `src/App.css` | Shell, History, forms, details, sign-in, theme toggle and responsive component styles. |
 
 ### Configuration and tooling
 
-- **Frontend commands:** `package.json` defines `pnpm dev`, `pnpm lint`, `pnpm build` (`tsc -b && vite build`) and `pnpm preview`. There is no test script or committed automated application suite. Use pnpm to update the lockfile, not hand edits to dependency resolution.
-- **Vite:** `vite.config.ts` loads the React plugin, serves on port 5173 and proxies `/api` to `http://localhost:8000`. The preview currently makes no such requests; preserve the proxy for later integration. `public/` files are served at root paths, while `src/assets/` files would be imported/bundled.
-- **Backend:** `main.py` exports `app`, used by `uvicorn main:app` from `backend/`. `requirements.txt` contains FastAPI/Uvicorn/Pydantic and supporting dependencies, not SQLAlchemy or test tooling. Reuse `backend/.venv` and the existing pip/requirements workflow.
-- **Dev container:** `devcontainer.json` selects a Python development image and Node/pnpm feature and forwards 5173/8000. Its `postCreateCommand` creates or reuses `backend/.venv` and installs `backend/requirements.txt` on container creation, not every restart. Rebuild an existing container to apply this setup; rerun pip explicitly after requirements changes. `devcontainer-lock.json` is tooling-managed feature-resolution metadata, not application state.
-- **Server startup:** `.vscode/tasks.json` defines folder-open background startup tasks. `start-dev.sh` separately checks whether each port is responding before launching missing servers and writing logs. It only installs backend requirements when creating a missing venv; it does not install frontend dependencies. Its presence does not mean `devcontainer.json` invokes it automatically. Avoid duplicate server processes.
-- **Lint/type configuration:** `.oxlintrc.json` configures the existing Oxlint rules; `tsconfig*.json` configures TypeScript rather than runtime behavior. Do not replace the lint/toolchain setup just to change a page.
-- **Repository automation:** `.github/dependabot.yml` configures dependency updates. It is not an application deployment or test pipeline.
+- **Frontend commands:** `pnpm dev`, `pnpm lint`, `pnpm build` (`tsc -b && vite build`) and `pnpm preview`. Update dependency resolution through pnpm.
+- **Vite:** React plugin, port 5173 and `/api` proxy to `http://localhost:8000`. `public/` files are served at root paths; imported source assets are bundled.
+- **Backend:** `main.py` exports `app` for `uvicorn main:app`. `requirements.txt` pins FastAPI/Uvicorn/Pydantic and supporting dependencies. Use `backend/.venv` and pip requirements.
+- **Dev container:** Python image with Node/pnpm, ports 5173/8000. On creation, `postCreateCommand` creates/reuses the venv and installs requirements. Rebuild to apply setup changes; rerun pip after requirements changes. The lockfile records resolved feature metadata.
+- **Startup:** `.vscode/tasks.json` defines folder-open tasks. `.devcontainer/start-dev.sh` checks ports, starts missing servers and logs to `.devcontainer/logs/`. It installs requirements when creating a missing venv. Install frontend dependencies with pnpm and update existing venvs explicitly.
+- **Checks:** `.oxlintrc.json` owns lint rules; `tsconfig*.json` owns TypeScript configuration.
+- **Repository automation:** `.github/dependabot.yml` configures dependency updates.
 
 ## How the current app fits together
 
@@ -115,11 +115,11 @@ src/main.tsx -> imports index.css -> mounts App.tsx
          |--- Cancel / retry -> update in-memory run
          |--- Completed details -> shared illustrative transcript
 
-Separate, unused by current UI:
+Health API:
 backend/main.py -> GET /api/health -> {"status":"OK!"}
 ```
 
-The preview starts signed in on History. Internal navigation is React state, not browser URL routes; switching pages does not stop the shell timer. Leaving Upload before submission unmounts and resets the form. Sign-out hides run information, cancels active simulated transfers after confirmation and pauses remaining simulation. Reload restores initial fixtures/sign-in/page state. The only persistent browser setting is theme preference under `ssscribe-theme`; no run information is stored there.
+The preview starts signed in on History. React state owns navigation; the shell timer continues across page changes. Leaving Upload resets the form. Sign-out hides records, confirms cancellation of simulated transfers and pauses remaining simulation. Reload restores initial runs/identity/page; theme preference persists under `ssscribe-theme`.
 
 ## Where do I change something?
 
@@ -139,7 +139,7 @@ All frontend paths in this table are relative to `frontend/` unless otherwise no
 | Sample runs, shared transcript, date/size formatting | `src/preview.ts` |
 | Simulation stages versus timing | Transition helper in `src/preview.ts`; interval, retry and cancellation in `src/App.tsx` |
 | Transcript/details presentation | `RunDetail` in `src/components.tsx`; styles in `src/App.css` |
-| Mock sign-in/out | `src/App.tsx` (not backend auth) |
+| Mock sign-in/out | `src/App.tsx` |
 | Browser metadata or favicon | `index.html`, `public/favicon.svg` |
 | Frontend dependencies or package scripts | `package.json` and pnpm-managed `pnpm-lock.yaml` |
 | Development proxy/port | `vite.config.ts`; align root startup docs, `.vscode/tasks.json` and helper configuration as applicable |
@@ -147,29 +147,28 @@ All frontend paths in this table are relative to `frontend/` unless otherwise no
 | Python dependencies | Repository-root `backend/requirements.txt`, installed into existing venv |
 | Startup/environment troubleshooting | Root README, `.vscode/tasks.json`, `.devcontainer/start-dev.sh`, `.devcontainer/devcontainer.json` |
 | Product scope or implementation status | `docs/REQUIREMENTS.md`, `docs/IMPLEMENTATION_PLAN.md`, root/frontend READMEs |
+| Planned service boundaries, callers or Azure Speech API flow | `docs/IMPLEMENTATION_PLAN.md` for service ownership; `docs/API_DATA_FLOW.md` for ordered Mermaid call sequences, exact Speech operation names, triggers and schedules |
 
 ## Generated and machine-local directories
 
-These may appear in a working checkout but are **not maintained application source**:
-
 | Path | Purpose / handling |
 |---|---|
-| `.git/` | Git history and repository metadata. Do not edit internals to implement application features. |
+| `.git/` | Git history and repository metadata. |
 | `frontend/node_modules/` | Installed packages. Ignored; recreate with pnpm. |
-| `frontend/dist/` | Generated production build. Ignored; recreate with `pnpm build`, not manual edits. |
-| `backend/.venv/` | Local Python environment. Ignored; not source or a deployment artifact. |
+| `frontend/dist/` | Generated production build. Ignored; recreate with `pnpm build`. |
+| `backend/.venv/` | Local Python environment. Ignored; recreate with venv/pip. |
 | `backend/__pycache__/`, `*.pyc` | Generated Python bytecode, ignored. |
-| `.devcontainer/logs/` | Local helper logs (`vite.log`, `uvicorn.log` when generated), ignored. Useful for startup failures, not source. |
-| Other editor caches / TypeScript build metadata | Tool output; inspect ignore rules and do not confuse it with maintained configuration. |
+| `.devcontainer/logs/` | Helper logs (`vite.log`, `uvicorn.log`), ignored. |
+| Other editor caches / TypeScript build metadata | Tool output; handled by the applicable ignore rules. |
 
-Root `.gitignore` and `frontend/.gitignore` define the actual exclusions. Do not commit secrets, uploaded audio or local database files even if an ignore pattern is missing.
+Root `.gitignore` and `frontend/.gitignore` define exclusions. Add application-data exclusions before generating persistence.
 
-## Future structure: not present yet
+## Planned connected structure
 
-There is no typed API client, backend auth adapter, SQLAlchemy model/database, local audio store, queue/worker or test directory yet. Proposed `backend/data/app.db` and `backend/data/uploads/` **do not exist as implemented stores**. Add appropriate DB/sidecar/upload/partial Git exclusions before generating persistence; current root rules do not cover those application-data paths.
+Future modules cover a typed API client, backend auth/routes, SQLAlchemy models, upload/storage adapters, a Speech client and lifespan-managed SQL polling loops. Separate storage and Speech HTTP mocks own audio and simulated service jobs/results. Main FastAPI owns application SQL and business logic.
 
-The planned connected MVP will replace the preview boundary with FastAPI-backed state, persist readable transcript text in SQL, and use local storage/fake transcription adapters with later Azure replacements. Candidate module names in the implementation plan are suggestions, not files to look for in today's tree. Update this guide when those modules actually arrive.
+Proposed stores are `backend/data/app.db` and `backend/data/uploads/`; add DB/sidecar/upload/partial exclusions before generating them. SQL retains workflow state, claims, Speech IDs, due times and unfinished imports across restarts. See the [implementation plan](IMPLEMENTATION_PLAN.md) for candidate modules, delivery order and production architecture.
 
 ## Keeping this guide useful
 
-When paths, responsibilities, startup commands or implementation boundaries change, update this guide and the root README in the same change. Keep the README concise and link here for the detailed map. Document maintained files and common navigation tasks rather than dependency internals; clearly separate implemented source, generated/local output and planned additions. Follow the [maintenance instructions](../AGENTS.md) and verify local links/paths before finishing.
+When paths, responsibilities, startup commands or implementation boundaries change, update this guide and the root README in the same change. Keep the README concise and link here for the detailed map. Document maintained files and common navigation tasks. Separate implemented source, generated/local output and planned additions. Follow the [maintenance instructions](../AGENTS.md) and verify local links/paths before finishing.
