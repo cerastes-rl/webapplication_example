@@ -7,7 +7,7 @@
 - **M2 — connected local application:** planned after UI approval. FastAPI/SQLite own records and workflow state, a storage HTTP mock persists audio, and a Speech HTTP mock returns deterministic batch results. FastAPI lifespan loops query SQL and execute submission, monitoring, import and recovery logic.
 - **P1 — follow-ups:** filename/status search, transcript copy/download and transcript search.
 
-Use [implementation plan](IMPLEMENTATION_PLAN.md) for delivery, [UI research](UI_RESEARCH.md) for design rationale and [AGENTS.md](../AGENTS.md) for implementation conventions.
+Use the [local implementation plan](LOCAL_IMPLEMENTATION_PLAN.md) for delivery and local contracts, the [architecture plan](IMPLEMENTATION_PLAN.md) for the Azure end state, [UI research](UI_RESEARCH.md) for design rationale and [AGENTS.md](../AGENTS.md) for implementation conventions.
 
 ## Product behavior
 
@@ -59,23 +59,23 @@ A **run** represents one submission and saved options. In M2 create its stable I
 | ID | Acceptance criteria |
 |---|---|
 | API-01 | Small typed `/api` client, Pydantic request/response models, stable IDs, UTC timestamps and predictable errors. Proposed envelope: `{"error":{"code":"…","message":"…"}}`. API failures render actionable errors. Preserve health response. |
-| AUTH-01 | Fixed-user adapter inside FastAPI with sign-in/me/sign-out. Protect recording/upload/transcript/retry/cancel with credentials/ownership checks and 401 when signed out. Refresh restores the active session. Sign-out handles active transfer, clears protected views and stops UI polling; backend work continues. |
+| AUTH-01 | Fixed-user adapter inside FastAPI with sign-in/me/sign-out. Protect recording/upload/transcript/retry/cancel with credentials/ownership checks and 401 when signed out. Refresh restores the active session; a backend restart may require local sign-in again. Sign-out handles active transfer, clears protected views and stops UI polling; backend work continues. |
 | API-02 | OpenAPI contracts for reads, authorization, streamed transfer, completion, retry and cancellation. Include run ID/options/upload state so unfinished submissions are visible. Storage keys and external Speech IDs remain private metadata. |
 
-Health is implemented. Finalize the following proposed contracts with run-aware DTOs before their delivery slices:
+Health is implemented. The [local plan](LOCAL_IMPLEMENTATION_PLAN.md#3-contracts-and-durable-state) defines the planned run-based contracts:
 
 | Method / route | Response and behavior |
 |---|---|
 | `GET /api/health` | 200 `{"status":"OK!"}`. |
-| `GET /api/files` | 200 list including run ID/options and incomplete uploads; may evolve to run-oriented reads. |
-| `GET /api/files/{file_id}` | 200 run/file state, 404 unknown; supports pre-transfer records. |
-| `GET /api/files/{file_id}/transcript` | 200 stored text/ID/time, 404 unknown file, 409 incomplete. |
+| `GET /api/runs` | 200 list including run ID/options and incomplete uploads. |
+| `GET /api/runs/{run_id}` | 200 run/file state, 404 unknown; supports pre-transfer records. |
+| `GET /api/runs/{run_id}/transcript` | 200 stored text/ID/time, 404 unknown run, 409 incomplete. |
 | `POST /api/uploads/authorize` | 201 creates run/upload metadata and saves options before transfer; returns run/upload IDs, restricted local transport URL/method and constraints. |
 | Storage upload URL, route pending | Raw streamed transfer to the separate storage mock. Proposed 204 stored, 404 unknown authorization, 413 oversized, 415 unsupported type. Validate actual bytes/claimed length. |
 | `POST /api/uploads/complete` | 202 verifies stored bytes, finalizes existing run/file and creates one ready SQL job. Missing/incomplete bytes: 409. Repeated confirmation returns the same IDs/current state across restarts. |
-| `POST /api/files/{file_id}/retry` | 202 marks eligible failed processing ready with the same recording/options. Unknown: 404; wrong state/concurrent duplicate: 409. |
+| `POST /api/runs/{run_id}/retry` | 202 marks eligible failed processing ready with the same recording/options. Unknown: 404; wrong state/concurrent duplicate: 409. |
 | `/api/auth/sign-in`, `/api/auth/me`, `/api/auth/sign-out` | Proposed POST/GET/POST routes for the local fixed-user session. |
-| Upload restart/cancel, routes pending | Restart transfers from zero with reselection as needed. Persist cancellation and clean partials/abandoned objects. |
+| `POST /api/runs/{run_id}/cancel` | Cancel uploading/finalizing work before readiness; persist cancellation and clean partials/abandoned objects. Reconcile interrupted transfers before starting a new submission with reselection. |
 
 ### Transfer and persistence
 
@@ -114,7 +114,7 @@ Proposed local stores: `backend/data/app.db`, `backend/data/uploads/`. Deliver s
 | Azure AI Speech | Asynchronous batch recognition and results |
 | Microsoft Entra ID | User authentication |
 
-Replace local storage/Speech HTTP mocks and SQLite through their adapters. Session/access contracts, cleanup intervals and connected file/duration/options policy remain open. See [architecture](IMPLEMENTATION_PLAN.md#architecture-diagrams) and [call sequences](API_DATA_FLOW.md).
+Replace local storage/Speech HTTP mocks and SQLite through their adapters. Production session/access contracts, cleanup intervals and connected file/duration/options policy remain open. Local sessions and cancellation follow the local implementation plan. See [architecture](IMPLEMENTATION_PLAN.md#architecture-diagrams) and [call sequences](API_DATA_FLOW.md).
 
 ## P1 follow-ups
 

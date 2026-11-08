@@ -1,6 +1,6 @@
 # End-state API calls and data flow
 
-**Planned application.** Backend integration follows UI approval.
+**Planned application.** Backend integration follows UI approval. These diagrams are an architecture reference, not the local implementation checklist. Follow the [local implementation plan](LOCAL_IMPLEMENTATION_PLAN.md) for concrete contracts and delivery order. Its `/api/runs/{run_id}` reads/retry/cancel routes replace the proposed file-based routes below; upload IDs still identify transfers. Local interrupted transfers restart as new submissions after reconciliation. The mock correlation lookup used for uncertain submissions is local-only and requires a verified replacement for Azure.
 
 FastAPI hosts HTTP routes and lifespan-managed background loops. SQL stores durable workflow state; loops query due rows to execute business functions.
 
@@ -189,6 +189,6 @@ Retry preserves recording/options and starts a new submission attempt through di
 
 Local connected development uses Vite, **one main FastAPI process with loops/mock auth**, SQLite and separate storage/Speech HTTP mocks. Storage owns audio/partials, Speech owns simulated jobs/results, and main FastAPI owns application SQL.
 
-Open decisions: session/credential design, source/upload authorization, connected size/duration/options policy, cancellation route, recovery/retention intervals and mock ports/startup commands. Configure production managed identities/RBAC and monitoring during deployment.
+The [local plan](LOCAL_IMPLEMENTATION_PLAN.md) defines local sessions, cancellation, proposed mock ports and recovery behavior. Remaining decisions include connected size/duration/options policy, configured recovery intervals and production credentials/source authorization/retention. Configure production managed identities/RBAC and monitoring during deployment.
 
 See [service ownership and deployment contract](IMPLEMENTATION_PLAN.md#service-boundaries-local-now-azure-later) and [application API requirements](REQUIREMENTS.md#api-and-authentication). Speech references: [submit](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/batch-transcription-create), [retrieve results](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/batch-transcription-get), [audio access](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/batch-transcription-audio-data), [polling guidance](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/batch-transcription#best-practices-for-improving-performance).

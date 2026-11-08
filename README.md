@@ -7,7 +7,8 @@ SSScribe is a React UI preview for submitting recordings, following simulated pr
 - [Project structure](docs/PROJECT_STRUCTURE.md): maintained files, responsibilities and editing guide.
 - [Frontend guide](frontend/README.md): controls, scenarios and manual review checklist.
 - [Requirements](docs/REQUIREMENTS.md): current coverage and acceptance criteria.
-- [Implementation plan](docs/IMPLEMENTATION_PLAN.md): delivery steps and production/local architecture diagrams.
+- [Architecture and end-state plan](docs/IMPLEMENTATION_PLAN.md): service boundaries, Azure deployment and architecture diagrams.
+- [Local implementation plan](docs/LOCAL_IMPLEMENTATION_PLAN.md): minimal connected delivery slices, contracts, recovery and acceptance checks.
 - [API and data flow](docs/API_DATA_FLOW.md): ordered calls, Speech operation names, triggers and schedules.
 - [UI research](docs/UI_RESEARCH.md): product references and design rationale.
 - [Agent instructions](AGENTS.md): implementation and documentation guidelines.
@@ -68,7 +69,7 @@ See the [project structure guide](docs/PROJECT_STRUCTURE.md) for the source tree
 
 ## Planned connected application
 
-**Approve the UI before backend integration.** The connected milestone makes FastAPI/SQLite authoritative for runs, status and transcripts, with actual audio stored by a separate HTTP storage mock. A separate Speech API mock produces deterministic batch results.
+**Approve the UI before backend integration.** Follow the [local implementation plan](docs/LOCAL_IMPLEMENTATION_PLAN.md) for delivery. The connected milestone makes FastAPI/SQLite authoritative for runs, status and transcripts, with actual audio stored by a separate HTTP storage mock. A separate Speech API mock produces deterministic batch results.
 
 FastAPI hosts request handlers and lifespan-managed background loops. SQL stores workflow state, claims, Speech IDs, next-action times, errors and unfinished imports. Loops query due rows, submit jobs, poll Speech, import results and recover interrupted work.
 
@@ -85,6 +86,6 @@ The upload flow saves a run/options before transfer, streams audio directly to s
 
 Start with one backend process, one Uvicorn worker and one App Service instance. Add SQL-backed leases before scale-out. Enable App Service Always On on a supported plan and resume durable work after restarts. Store readable transcripts as SQLite `TEXT` and Azure SQL `NVARCHAR(MAX)`, with private storage references and Speech IDs in SQL.
 
-**Open decisions:** connected size/duration policy, Speech option mapping, session/access contracts, upload cancellation routes and cleanup intervals. The preview's 4 GB limit must be reconciled with Speech batch's documented **1 GB input** and **240-minute diarization** limits. See [Speech planning notes and sources](docs/IMPLEMENTATION_PLAN.md#azure-speech-api-interaction).
+**Open decisions:** connected size/duration policy, Speech option mapping, production session/access contracts and cleanup intervals. Local session and upload cancellation contracts are defined in the local implementation plan. The preview's 4 GB limit must be reconciled with Speech batch's documented **1 GB input** and **240-minute diarization** limits. See [Speech planning notes and sources](docs/IMPLEMENTATION_PLAN.md#azure-speech-api-interaction).
 
 Proposed local persistence paths are `backend/data/app.db` and `backend/data/uploads/`. Add Git exclusions for databases, sidecars, audio and partials before generating them. Document service startup, seeds, reset and cleanup commands as those features are delivered.

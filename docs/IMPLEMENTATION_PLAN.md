@@ -1,20 +1,12 @@
-# SSScribe implementation plan
+# SSScribe architecture and end-state plan
 
-## Current status and delivery order
+## Status and delivery guide
 
-The React preview is implemented for review. It starts signed in on History, uses typed fixtures and simulates run progress in browser memory. FastAPI exposes `GET /api/health`. See [requirements](REQUIREMENTS.md) for coverage and [frontend guide](../frontend/README.md) for review steps.
+The React preview is implemented for review; FastAPI currently exposes only `GET /api/health`. UI acceptance and explicit UI approval remain pending. Backend integration follows that approval.
 
-| Step | Status |
-|---|---|
-| 1. History and shell | Implemented for review |
-| 2. Transcript details | Implemented for review |
-| 3. Preview interactions | Implemented; scenario controls need completion |
-| 4. UI acceptance | Browser/accessibility review, focused tests and approval pending |
-| 5–10. Connected application | Planned after UI approval |
+This document describes the application architecture and Azure end state. Use the [local implementation plan](LOCAL_IMPLEMENTATION_PLAN.md) for the ordered local delivery slices, concrete mock contracts, recovery behavior and acceptance checks. Persistent reads and auth are delivered together, followed by upload, processing and recovery.
 
-**Delivery order:** History → details → preview interactions → UI acceptance/approval → read API spike → SQLite persistence → mock auth → real upload → Speech coordination → connected acceptance.
-
-Use pnpm/Oxlint, the Python venv/requirements workflow, Vite's `/api` proxy and ports 5173/8000. Deliver small, reviewable changes. Proposed module paths below describe where future code can live.
+Use [requirements](REQUIREMENTS.md) for acceptance criteria and the [frontend guide](../frontend/README.md) for UI review. The [API flow diagrams](API_DATA_FLOW.md) explain service interactions; their proposed file routes are superseded locally by run-based routes.
 
 ## Product and architecture decisions
 
@@ -59,7 +51,7 @@ FastAPI owns business logic and lifespan-managed background loops. SQL stores wo
 | Azure AI Speech batch API | Separate HTTP Speech mock | Asynchronous service jobs, source-audio reads, status and result JSON |
 | Azure SQL Database | SQLite through SQLAlchemy | Runs/options/files/jobs, claims, Speech IDs, due times, errors, import state and readable transcripts |
 
-The frontend makes application calls to FastAPI and sends authorized audio directly to storage. Speech reads authorized source audio. FastAPI background loops retrieve results and save readable text in SQL. Local storage and Speech mocks own their respective data. See [API and data flow](API_DATA_FLOW.md) for exact calls and triggers.
+The frontend makes application calls to FastAPI and sends authorized audio directly to storage. Speech reads authorized source audio. FastAPI background loops retrieve results and save readable text in SQL. Local storage and Speech mocks own their respective data. See [API and data flow](API_DATA_FLOW.md) for illustrative calls and triggers, and the [local plan](LOCAL_IMPLEMENTATION_PLAN.md#3-contracts-and-durable-state) for local contracts.
 
 Store `storage_provider` and object key privately in SQL, resolving fresh access URLs when needed. Public DTOs expose application IDs, metadata, options and state. Store readable transcript text as SQLite `TEXT`, later Azure SQL `NVARCHAR(MAX)`.
 
@@ -141,7 +133,7 @@ flowchart TB
     L -->|"Verify or remove abandoned objects"| B
 ```
 
-The storage mock streams bytes to disk; the Speech mock owns simulated jobs/results and can serve local result-content URLs. Document mock ports, browser-reachable grants and startup helpers when delivered.
+The storage mock streams bytes to disk and retains object receipts. The Speech mock persists simulated jobs/results across restarts and serves local result-content URLs. The [local plan](LOCAL_IMPLEMENTATION_PLAN.md) defines proposed ports, source checks, browser-reachable grants and startup delivery.
 
 #### Background-loop execution contract
 
@@ -179,70 +171,28 @@ Preserve current Upload validation, mock sign-in/out, retry/cancel, theme and si
 
 Add focused interaction tests using Vitest, React Testing Library and a DOM environment. Add a documented test script with the tooling. Cover file validation, navigation/details, retry/cancel, sign-in/out, themes and scenario recovery.
 
-Complete keyboard, focus, announcements, contrast ≥4.5:1, reduced-motion, 320px/desktop and light/dark review. Run lint/build and the added tests. **Obtain explicit UI approval before step 5.**
+Complete keyboard, focus, announcements, contrast ≥4.5:1, reduced-motion, 320px/desktop and light/dark review. Run lint/build and the added tests. **Obtain explicit UI approval before backend integration.**
 
-## 5. Read API integration spike
+## Connected local delivery
 
-**Requirements:** API-01/API-02 read subset, INT-01.
+Follow the [local implementation plan](LOCAL_IMPLEMENTATION_PLAN.md#6-delivery-slices-and-checks):
 
-Add Pydantic DTOs and read handlers, for example `backend/schemas.py` and `backend/routes/files.py`. Preserve `main:app` and health. Add a typed `/api` client, for example `frontend/src/api/client.ts`, with cancellation, response validation and predictable errors. Use temporary labeled static backend read responses for this slice, then replace them with SQLite in step 6.
+1. Persistent History and mock session, backed by SQLite from the first connected read.
+2. Actual direct upload, completion, cancellation and reconciliation.
+3. Durable Speech mock, background execution, transcript import and retry.
+4. Service restart/outage recovery and connected acceptance.
 
-Test unknown file 404, incomplete transcript 409, unavailable backend and stale responses during selection changes. Show actionable API errors and preserve selection correctly.
+Routes identify runs explicitly; a file may eventually have multiple runs with different settings. M2 restarts interrupted transfers as new submissions after reconciliation, and limits cancellation to uploads before readiness. Changed-option reprocessing and processing cancellation remain later work.
 
-## 6. SQLite persistence
+## Production deployment requirements
 
-**Requirements:** DATA-01–DATA-03, API-01/API-02.
-
-Add SQLAlchemy through `requirements.txt`. Candidate modules: `database.py`, `models.py`, `services/recordings.py`, `seed.py`. Use request/task-scoped sessions and atomic writes.
-
-Create runs/files/jobs/transcripts with saved options, upload state/failure stage, private storage keys, durable scheduling/submission/import state and readable text. Relate processing and transcripts to runs. Seed deterministic completed/retriable failed examples idempotently.
-
-Proposed stores: `backend/data/app.db`, `backend/data/uploads/`. Add Git exclusions for DBs, sidecars, uploads and partials first. Test relationships, seeds, DTO privacy and persistence across app recreation. Document explicit development reset commands.
-
-## 7. Mock session
-
-**Requirements:** AUTH-01.
-
-Implement fixed-user sign-in/me/sign-out inside FastAPI. Proposed routes are `/api/auth/sign-in`, `/api/auth/me`, `/api/auth/sign-out`. An opaque HttpOnly SameSite=Lax cookie with an in-memory session registry is a candidate local contract. Confirm it before coding.
-
-Protect recording operations with credentials/ownership checks. Restore identity at startup; clear protected views and stop UI polling on sign-out/401. Guard stale responses. Test session restoration, unauthorized calls, ownership and sign-out races.
-
-## 8. Actual upload and SQL readiness
-
-**Requirements:** UP-01–UP-03, DATA-01, API-02.
-
-Resolve connected limits/options, transport authorization and cancellation/restart routes. Implement the separate storage mock, main-API storage adapter and upload service. Persist the run/options before authorization. Stream actual bytes to generated paths with bounded memory, validate metadata/actual length and finalize storage safely.
-
-`POST /api/uploads/complete` verifies the object, finalizes the existing run/file and creates one ready job transactionally. Repeated/concurrent confirmations return the same IDs/current state. Add the shell upload manager with measured progress and finalizing. Persist interruption/cancellation and reconcile stale objects safely.
-
-Test exact/over-limit streams using small injected limits, actual stored-byte equality, empty/invalid files, MIME aliases/mismatches, disconnects, disk errors, repeated completion, healthy slow transfers, cleanup and restart persistence.
-
-## 9. Speech mock and background business logic
-
-**Requirements:** JOB-01–JOB-03, DATA-01/DATA-02, API-02 retry, QA-01.
-
-Implement the separate Speech HTTP mock with batch submit/status/file-list/result-content, source access checks, deterministic JSON and predictable failures. Implement FastAPI lifespan submission, monitoring/import and recovery loops according to the execution contract above.
-
-Retry preserves run/file/options, conditionally marks eligible failed work ready and starts a new Speech attempt at durable submission-start. Resume existing IDs/imports after restart. Record uncertain submissions for reconciliation and supervise loop failures.
-
-Use controlled clocks to test transitions, failure/retry, inaccessible audio, timeouts, overlapping scans, concurrent retries, lost responses, partial imports, shutdown and restart recovery.
-
-## 10. Connected acceptance
-
-**Requirements:** INT-01, QA-01, DOC-01 and M2 gate.
-
-Add conservative non-overlapping UI polling while signed in with active runs (proposed three seconds). Stop on sign-out, unmount or terminal work. Preserve selection and ignore stale responses.
-
-Acceptance journey:
-
-1. Start Vite, main FastAPI with loops, storage mock and Speech mock using documented commands.
-2. Sign in, see labeled examples and inspect saved options/transcripts.
-3. Upload an actual file, see the run before transfer finishes, navigate internally, observe measured transfer/finalizing/processing states and read the stored transcript.
-4. Retry a processing failure; cancel another upload and verify its retained outcome and cleanup.
-5. Verify validation, interrupted transfers, lost responses, backend outage and error recovery.
-6. Reload/restart and verify records, stored bytes, seeds and resumed Speech/import work.
-7. Check sign-out races, keyboard operation, responsive layout, announcements and both themes.
-8. Run tests/lint/build, `git diff --check`, review Git status and record M2 acceptance.
+- Provision the six core services above. App Service also needs a hosting plan. Linking App Service behind Static Web Apps `/api` requires [Static Web Apps Standard](https://learn.microsoft.com/en-us/azure/static-web-apps/apis-app-service).
+- Choose one authentication path (frontend Entra tokens validated by the API, or a deliberately configured platform session). Configure tenant restrictions, scopes, ownership checks and the trusted ingress boundary; a fixed-user local session does not validate production identity behavior.
+- Use managed identities/RBAC where supported. Configure separate browser upload and Speech source-read authorization, Blob CORS and retention. Private objects require an explicitly supported access strategy; do not assume private network endpoints are necessary or sufficient for Speech access.
+- Configure Always On and restart recovery. Before multiple workers/instances, add SQL-backed leases, bounded concurrency and tests for competing claims. A separate worker service can be introduced if workload or availability requires it.
+- Validate Azure SQL schema/types, driver setup, transactions and concurrent claims against Azure SQL. SQLite/SQLAlchemy is a development boundary, not proof of equivalent locking behavior.
+- Verify Speech API version/options, duration/size enforcement, polling intervals and uncertain-submission reconciliation against the real service before enabling live jobs. The local mock's correlation lookup/deduplication is not an Azure guarantee.
+- Add Azure Monitor/Application Insights for request, dependency and worker failures, plus stalled-job alerts. Use Key Vault for remaining secrets when needed; keep credentials and audio/transcript contents out of logs.
 
 ## Commands and documentation
 

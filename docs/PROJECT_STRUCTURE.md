@@ -54,7 +54,8 @@ SSScribe/                            Repository root (actual checkout name may d
 |--- docs/                           Project documentation
 |    |--- PROJECT_STRUCTURE.md       This guide: paths, responsibilities and editing map
 |    |--- REQUIREMENTS.md            Behavior, coverage/gaps and acceptance criteria
-|    |--- IMPLEMENTATION_PLAN.md     Progress, service/call table, Speech API flow, diagrams and steps
+|    |--- IMPLEMENTATION_PLAN.md     Target architecture, Speech API flow and Azure deployment
+|    |--- LOCAL_IMPLEMENTATION_PLAN.md  Local delivery slices, contracts, recovery and checks
 |    |--- API_DATA_FLOW.md           Planned end-state call sequences, triggers, schedules and recovery
 |    |--- UI_RESEARCH.md             Public-product research and design rationale
 |    |--- notes.md                   Informal demo feedback
@@ -167,7 +168,7 @@ Root `.gitignore` and `frontend/.gitignore` define exclusions. Add application-d
 
 Future modules cover a typed API client, backend auth/routes, SQLAlchemy models, upload/storage adapters, a Speech client and lifespan-managed SQL polling loops. Separate storage and Speech HTTP mocks own audio and simulated service jobs/results. Main FastAPI owns application SQL and business logic.
 
-Proposed stores are `backend/data/app.db` and `backend/data/uploads/`; add DB/sidecar/upload/partial exclusions before generating them. SQL retains workflow state, claims, Speech IDs, due times and unfinished imports across restarts. See the [implementation plan](IMPLEMENTATION_PLAN.md) for candidate modules, delivery order and production architecture.
+Proposed stores are `backend/data/app.db` and `backend/data/uploads/`; add DB/sidecar/upload/partial exclusions before generating them. SQL retains workflow state, claims, Speech IDs, due times and unfinished imports across restarts. See the [local implementation plan](LOCAL_IMPLEMENTATION_PLAN.md) for candidate modules, contracts and delivery order, and the [architecture plan](IMPLEMENTATION_PLAN.md) for the Azure end state.
 
 ## Keeping this guide useful
 
