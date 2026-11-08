@@ -2,7 +2,7 @@
 
 ## Status and purpose
 
-**Planned; implementation follows explicit UI approval.** The current app is a React preview and a FastAPI health endpoint. Approval of the architecture or this document does not by itself approve the UI.
+**Connected application planned; integration follows explicit UI approval.** The current app is a React preview and a FastAPI health endpoint. A separate minimal `backend/speech_mock.py` now reads/writes local text files under `backend/data/blobs/`, with no HTTP storage dependency. Its job dictionary is in memory; the durable service architecture below remains planned. Approval of the architecture or this document does not by itself approve the UI.
 
 Build one usable local journey: sign in, upload a recording, follow durable progress, read a stored sample transcript, retry a processing failure and cancel an upload. Records and audio survive reloads and service restarts. Recognition is simulated and clearly labeled.
 
@@ -10,14 +10,20 @@ This is the delivery guide for M2 in [requirements](REQUIREMENTS.md). The [imple
 
 ## 1. Small local architecture
 
-| Component | Local implementation | Owns | Azure equivalent |
-|---|---|---|---|
-| Frontend | Existing React/TypeScript/Vite, port 5173 | Presentation, typed API client, shell-owned upload | Static Web Apps |
-| Application | FastAPI/Uvicorn, port 8000, one worker | Authentication, business rules, application SQL, background execution | App Service |
-| Application database | SQLite through SQLAlchemy | Runs, files, jobs, transcripts | Azure SQL Database |
-| Storage mock | Separate FastAPI process, proposed port 8001 | Upload grants, streamed bytes, object metadata and partial cleanup | Private Blob Storage |
-| Speech mock | Separate FastAPI process, proposed port 8002 | Simulated batch jobs, source checks and result JSON | Azure AI Speech |
-| Identity | Fixed-user adapter inside the application | Local session and ownership checks | Microsoft Entra ID |
+✅ = implemented for the scope stated; ❌ = not yet implemented beyond any noted scaffold. A checkmark does not mean the component is integrated with the rest of the application or that UI acceptance is complete.
+
+| Component | Local implementation | Owns | Azure equivalent | Implemented |
+|---|---|---|---|---|
+| Frontend | React/TypeScript/Vite, port 5173 | UI preview; typed API client and actual shell-owned upload remain planned | Static Web Apps | ✅ UI preview |
+| Application | FastAPI/Uvicorn, port 8000, one worker | Planned authentication, business rules, application SQL and background execution | App Service | ❌ Health endpoint only |
+| Application database | Planned SQLite through SQLAlchemy | Runs, files, jobs, transcripts | Azure SQL Database | ❌ |
+| Storage mock | Planned separate FastAPI process, proposed port 8001 | Upload grants, streamed bytes, object metadata and partial cleanup | Private Blob Storage | ❌ |
+| Speech mock | `backend/speech_mock.py`, port 8002 | Timed text processing, local source/result files, status, paginated List Files and job expiry | Azure AI Speech | ✅ Standalone local-file mock |
+| Identity | Planned fixed-user adapter inside the application | Local session and ownership checks | Microsoft Entra ID | ❌ UI identity is simulated |
+
+The Speech mock currently uses `backend/data/blobs/` directly and keeps jobs in memory. It does not require the planned storage HTTP service. Durable jobs, service adapters and application integration remain planned.
+
+**Planned connected architecture:** the diagram below describes the later connected milestone, including HTTP storage and durable Speech jobs.
 
 ```mermaid
 flowchart LR
@@ -158,7 +164,7 @@ Candidate maintained modules, added only as needed:
 | Backend tests | `backend/tests/` |
 | Frontend API and transfer ownership | `frontend/src/api/`, `frontend/src/useUpload.ts` |
 
-Preserve `backend/main.py` and `uvicorn main:app`. Before generating data, ignore `backend/data/` including SQLite sidecars, grants, audio, partials and mock state. Proposed stores: application `backend/data/app.db`, storage `backend/data/uploads/` with its own receipts database, and Speech `backend/data/speech.db`. No runtime stores are committed.
+Preserve `backend/main.py` and `uvicorn main:app`. Keep `backend/data/` ignored, including SQLite sidecars, grants, audio, partials and mock state, with an exception for maintained `example*` files directly inside `backend/data/blobs/audio/`. Proposed stores: application `backend/data/app.db`, storage `backend/data/uploads/` with its own receipts database, and Speech `backend/data/speech.db`. No runtime stores are committed.
 
 Provide documented commands to start Vite and all three Python services, configure URLs/credentials, seed once, run checks, stop services and explicitly reset local data. Extend the existing startup helper after individual commands work; check ports without killing unrelated processes. Startup waits/retries for dependencies; a temporarily absent mock must not erase state. Logs identify the service and run/job but exclude credentials, grants and transcript contents.
 

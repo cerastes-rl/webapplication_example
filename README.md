@@ -67,9 +67,39 @@ The dev container forwards 5173/8000. On container creation, `postCreateCommand`
 
 See the [project structure guide](docs/PROJECT_STRUCTURE.md) for the source tree and editing map.
 
+## Run the standalone Speech mock
+
+```bash
+cd backend
+.venv/bin/python -m uvicorn speech_mock:app --host 127.0.0.1 --port 8002
+```
+
+Open http://localhost:8002/docs (forward port 8002 manually when using the dev container). This standalone mock reads/writes local files; it needs no storage service. Paths are relative to `backend/` and must stay under `data/blobs/`. A leading slash is optional and still means a backend-relative mock path.
+
+Ready-to-use UTF-8 text fixtures are in `backend/data/blobs/audio/`: `example.txt` and `example1.txt` through `example5.txt`. For example:
+
+```bash
+curl -sS -X POST 'http://localhost:8002/speechtotext/transcriptions:submit' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "displayName": "Text example",
+    "locale": "en-US",
+    "contentUrls": ["/data/blobs/audio/example.txt"],
+    "properties": {
+      "destinationContainerUrl": "/data/blobs/transcripts"
+    }
+  }'
+```
+
+Jobs spend 10 seconds in `NotStarted`, then 20 seconds in `Running`. The mock reads up to 1 MB of source text, appends “This sentence was appended by the mock Speech service.” and writes `contenturl_0.json` and `report.json` under `backend/data/blobs/transcripts/<job-id>/`. The resulting text is in `combinedRecognizedPhrases[0].display`. Optional `mock_fail=true` simulates failure.
+
+Poll the returned `self` URL for status. After success, follow `links.files` for file metadata/download URLs only. List Files accepts `skip` and `top` (for example, `?top=1`), returning `values` and an `@nextLink` when another page exists. It does not read files. GET each `contentUrl` separately to download through the mock's `/blobs/` route, or open the files on disk.
+
+A maintenance loop advances jobs without polling and removes only terminal job entries after 30 minutes, checking once per second. Source and output files are never deleted. Saved download URLs continue to work after job expiry and service restart. Run one worker; in-memory jobs disappear on restart. Missing files, invalid UTF-8 or failed writes mark the job failed; partial output from a failed write is retained. Local data and generated results are ignored by Git; files named `example*` directly inside `backend/data/blobs/audio/` are eligible for version control. The UI is not connected to this service.
+
 ## Planned connected application
 
-**Approve the UI before backend integration.** Follow the [local implementation plan](docs/LOCAL_IMPLEMENTATION_PLAN.md) for delivery. The connected milestone makes FastAPI/SQLite authoritative for runs, status and transcripts, with actual audio stored by a separate HTTP storage mock. A separate Speech API mock produces deterministic batch results.
+**Approve the UI before backend integration.** Follow the [local implementation plan](docs/LOCAL_IMPLEMENTATION_PLAN.md) for delivery and its [component status table](docs/LOCAL_IMPLEMENTATION_PLAN.md#1-small-local-architecture) for what is implemented. The connected milestone makes FastAPI/SQLite authoritative for runs, status and transcripts, with actual audio stored by a separate HTTP storage mock. A separate Speech API mock produces deterministic batch results.
 
 FastAPI hosts request handlers and lifespan-managed background loops. SQL stores workflow state, claims, Speech IDs, next-action times, errors and unfinished imports. Loops query due rows, submit jobs, poll Speech, import results and recover interrupted work.
 
@@ -85,6 +115,8 @@ FastAPI hosts request handlers and lifespan-managed background loops. SQL stores
 The upload flow saves a run/options before transfer, streams audio directly to storage and verifies the stored object before marking the SQL job ready. The shell owns the transfer across internal navigation. Interrupted transfers restart from zero and may require file reselection. Backend jobs continue while backend services run.
 
 Start with one backend process, one Uvicorn worker and one App Service instance. Add SQL-backed leases before scale-out. Enable App Service Always On on a supported plan and resume durable work after restarts. Store readable transcripts as SQLite `TEXT` and Azure SQL `NVARCHAR(MAX)`, with private storage references and Speech IDs in SQL.
+
+Production can later move background execution to [timer/queue-triggered Azure Functions](docs/IMPLEMENTATION_PLAN.md#production-consideration-timer-and-queue-triggered-azure-functions) when independent worker scaling is justified. This is an optional production consideration.
 
 **Open decisions:** connected size/duration policy, Speech option mapping, production session/access contracts and cleanup intervals. Local session and upload cancellation contracts are defined in the local implementation plan. The preview's 4 GB limit must be reconciled with Speech batch's documented **1 GB input** and **240-minute diarization** limits. See [Speech planning notes and sources](docs/IMPLEMENTATION_PLAN.md#azure-speech-api-interaction).
 

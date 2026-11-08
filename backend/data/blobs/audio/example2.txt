@@ -1,0 +1,4 @@
+Interview
+
+Interviewer: How do you prepare for a new project?
+Guest: I start by writing down the goal and the smallest useful next step.

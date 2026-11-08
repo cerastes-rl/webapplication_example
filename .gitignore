@@ -14,3 +14,12 @@
 
 # avoid generated logs?
 .devcontainer/logs/
+
+# Local application and mock data
+backend/data/*
+!backend/data/blobs/
+backend/data/blobs/*
+!backend/data/blobs/audio/
+backend/data/blobs/audio/*
+!backend/data/blobs/audio/example*
+backend/data/blobs/audio/*/

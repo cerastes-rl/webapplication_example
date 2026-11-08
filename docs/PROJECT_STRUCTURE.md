@@ -5,7 +5,7 @@ Maintained files, responsibilities and common editing locations. See [README](..
 ## Quick orientation
 
 - **`frontend/`:** React UI preview with in-memory runs and simulated progress.
-- **`backend/`:** FastAPI app exposing `GET /api/health`.
+- **`backend/`:** health API and a separate standalone Speech mock.
 - **`docs/`:** requirements, architecture, delivery plan and research.
 - **`.devcontainer/`, `.vscode/`, `.github/`:** development and repository configuration.
 
@@ -47,14 +47,16 @@ SSScribe/                            Repository root (actual checkout name may d
 |         |--- favicon.svg           Favicon referenced by index.html
 |         |--- icons.svg             Starter icon sprite
 |
-|--- backend/                        Python/FastAPI backend scaffold
+|--- backend/                        Python/FastAPI health API and standalone mock
 |    |--- main.py                    FastAPI app and GET /api/health
+|    |--- speech_mock.py             Separate batch mock: submit, timed states, result files and expiry
+|    |--- data/blobs/audio/example*   Version-controlled text fixtures, including example1.txt–example5.txt
 |    |--- requirements.txt           Pinned Python runtime dependencies
 |
 |--- docs/                           Project documentation
 |    |--- PROJECT_STRUCTURE.md       This guide: paths, responsibilities and editing map
 |    |--- REQUIREMENTS.md            Behavior, coverage/gaps and acceptance criteria
-|    |--- IMPLEMENTATION_PLAN.md     Target architecture, Speech API flow and Azure deployment
+|    |--- IMPLEMENTATION_PLAN.md     Target architecture, Speech API flow, Azure deployment and optional Functions/queue scaling
 |    |--- LOCAL_IMPLEMENTATION_PLAN.md  Local delivery slices, contracts, recovery and checks
 |    |--- API_DATA_FLOW.md           Planned end-state call sequences, triggers, schedules and recovery
 |    |--- UI_RESEARCH.md             Public-product research and design rationale
@@ -159,14 +161,19 @@ All frontend paths in this table are relative to `frontend/` unless otherwise no
 | `frontend/dist/` | Generated production build. Ignored; recreate with `pnpm build`. |
 | `backend/.venv/` | Local Python environment. Ignored; recreate with venv/pip. |
 | `backend/__pycache__/`, `*.pyc` | Generated Python bytecode, ignored. |
+| `backend/data/` | Local stores are ignored except `example*` files directly inside `blobs/audio/`. `blobs/audio/` contains local text sources and `blobs/transcripts/` can hold Speech mock results. Job expiry never deletes files. |
 | `.devcontainer/logs/` | Helper logs (`vite.log`, `uvicorn.log`), ignored. |
 | Other editor caches / TypeScript build metadata | Tool output; handled by the applicable ignore rules. |
 
-Root `.gitignore` and `frontend/.gitignore` define exclusions. Add application-data exclusions before generating persistence.
+Root `.gitignore` and `frontend/.gitignore` define exclusions. Only `example*` files directly inside `backend/data/blobs/audio/` are allowed through the data exclusions; generated results and other local files stay ignored.
+
+## Standalone Speech mock
+
+`backend/speech_mock.py` runs on port 8002 with existing Python dependencies and no storage service. It owns an in-memory job dictionary and a lifespan maintenance task. Submissions use local paths under `backend/data/blobs/` in `contentUrls` and `properties.destinationContainerUrl`. After simulated processing, it reads UTF-8 text, appends a fixed sentence and writes result/report JSON to the destination/job-ID directory. List Files returns metadata/download URLs with `skip`/`top` pagination and `@nextLink`, without reading contents. The same app serves downloads at `/blobs/`. File work runs in a thread; jobs are processed sequentially. Job metadata expires after 30 minutes or restart; files remain. See [startup and limitations](../README.md#run-the-standalone-speech-mock). Durable jobs and production storage adapters remain later work.
 
 ## Planned connected structure
 
-Future modules cover a typed API client, backend auth/routes, SQLAlchemy models, upload/storage adapters, a Speech client and lifespan-managed SQL polling loops. Separate storage and Speech HTTP mocks own audio and simulated service jobs/results. Main FastAPI owns application SQL and business logic.
+The [local architecture status table](LOCAL_IMPLEMENTATION_PLAN.md#1-small-local-architecture) tracks implemented components. Future modules cover a typed API client, backend auth/routes, SQLAlchemy models, upload/storage adapters, a Speech client and lifespan-managed SQL polling loops. Separate storage and Speech HTTP mocks own audio and simulated service jobs/results. Main FastAPI owns application SQL and business logic.
 
 Proposed stores are `backend/data/app.db` and `backend/data/uploads/`; add DB/sidecar/upload/partial exclusions before generating them. SQL retains workflow state, claims, Speech IDs, due times and unfinished imports across restarts. See the [local implementation plan](LOCAL_IMPLEMENTATION_PLAN.md) for candidate modules, contracts and delivery order, and the [architecture plan](IMPLEMENTATION_PLAN.md) for the Azure end state.
 

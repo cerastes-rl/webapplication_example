@@ -4,6 +4,7 @@
 
 - **M1 — UI preview:** implemented for review. React/TypeScript/Vite, navy branding, light/dark themes, Upload/History navigation, mock identity, simulated progress and sample details. Browser/accessibility review, focused tests and UI approval are the current acceptance tasks.
 - **Current backend:** `GET /api/health` → `{"status":"OK!"}`. Vite's `/api` proxy and dev-container ports 5173/8000 are configured.
+- **Standalone Speech mock — implemented:** local UTF-8 text input, timed states, retained result/report JSON, status and paginated List Files. Only in-memory jobs expire after 30 minutes; application integration and durable jobs remain planned. See the [component status table](LOCAL_IMPLEMENTATION_PLAN.md#1-small-local-architecture).
 - **M2 — connected local application:** planned after UI approval. FastAPI/SQLite own records and workflow state, a storage HTTP mock persists audio, and a Speech HTTP mock returns deterministic batch results. FastAPI lifespan loops query SQL and execute submission, monitoring, import and recovery logic.
 - **P1 — follow-ups:** filename/status search, transcript copy/download and transcript search.
 

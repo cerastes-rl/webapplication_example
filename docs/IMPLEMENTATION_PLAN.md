@@ -2,7 +2,7 @@
 
 ## Status and delivery guide
 
-The React preview is implemented for review; FastAPI currently exposes only `GET /api/health`. UI acceptance and explicit UI approval remain pending. Backend integration follows that approval.
+The React preview is implemented for review; the main FastAPI app exposes only `GET /api/health`. The standalone `backend/speech_mock.py` is also implemented: it processes local text files, writes retained results and exposes status/paginated file listings. See the [local component status table](LOCAL_IMPLEMENTATION_PLAN.md#1-small-local-architecture). UI acceptance and explicit UI approval remain pending. Backend integration follows that approval.
 
 This document describes the application architecture and Azure end state. Use the [local implementation plan](LOCAL_IMPLEMENTATION_PLAN.md) for the ordered local delivery slices, concrete mock contracts, recovery behavior and acceptance checks. Persistent reads and auth are delivered together, followed by upload, processing and recovery.
 
@@ -145,6 +145,29 @@ The storage mock streams bytes to disk and retains object receipts. The Speech m
 - Reconcile uncertain submissions and import idempotently. SQL and Speech transactions commit independently.
 - Use distinct schedules for ready-job scans, Speech polling, upload recovery and cleanup. UI polling reads persisted state.
 
+### Production consideration: timer and queue-triggered Azure Functions
+
+**Optional scale-out path; defer until justified.** Keep the initial production deployment's SQL-driven App Service worker. Azure Functions with Azure Queue Storage is worth adopting when sustained due-job backlog or the need to deploy/scale background execution independently of the API warrants another deployment. Speech performs the transcription itself; adding coordination workers does not increase Speech quotas or remove provider latency. The trigger bindings are straightforward, but reliable distributed execution is not a trivial addition.
+
+| Component | Responsibility if adopted |
+|---|---|
+| Timer-triggered Function | Periodically scan indexed SQL due-work rows in bounded batches and enqueue job IDs/action versions. A one-minute dispatch interval is a starting point; each job's persisted due time still controls Speech polling. |
+| Azure Queue Storage | Carry small work notifications; SQL remains authoritative for state, attempts and scheduling. Audio and transcripts stay outside messages. |
+| Queue-triggered Function | Claim one eligible SQL action, perform a bounded submit/status/import step using shared Python services/adapters, persist its outcome and return. Never wait inside an invocation for transcription to finish. |
+| App Service | Continue serving the API. Disable the migrated background loops so there is one execution path per responsibility. |
+
+The timer supplies the schedule; queue-triggered workers supply parallel execution. A timer invocation runs on only one instance within a Function App, even during scale-out. Queue-triggered Functions support concurrent processing and scale-out. See Microsoft's [timer behavior](https://learn.microsoft.com/en-us/azure/azure-functions/functions-bindings-timer#scale-out) and [queue trigger documentation](https://learn.microsoft.com/en-us/azure/azure-functions/functions-bindings-storage-queue-trigger).
+
+Minimum reliability requirements before adopting:
+
+- Treat queue delivery as at least once. Workers use conditional SQL claims with expiring leases and action versions; ignore duplicate, stale or already-completed notifications. Lease expiry must not cause an uncertain Speech submission to be blindly repeated.
+- Close the SQL/enqueue gap through the scheduled SQL sweep: API requests commit ready/due state, and the timer dispatches it. A failed send leaves work eligible for a later sweep; do not mark work dispatched before sending. An expiring dispatch marker can suppress repeated notifications while preserving recovery. Duplicate sends are safe under the SQL claim. This avoids requiring a transactional outbox for this design.
+- Persist the next due time before acknowledging a successful step. Release claims or recover expired ones after crashes. Keep idempotent imports and uncertain-submission reconciliation from the existing design.
+- Configure bounded concurrency, HTTP timeouts, queue retry delays and poison-message handling. Alert on poisoned work and record an actionable SQL outcome; repeated scheduled redispatch must not bypass the retry policy indefinitely. Cap scale to protect SQL connections and Speech request quotas.
+- Provision a Function App/hosting plan, host storage, identities/RBAC, SQL driver/configuration and monitoring. Reuse workflow functions with short-lived sessions and explicit inputs; avoid coupling them to FastAPI lifespan or request objects. Verify duplicate delivery, lease expiry and crashes between SQL updates and queue acknowledgement before switching execution.
+
+No Functions host, queue emulator or queue abstraction is required for M2. Keep local business logic callable independently of its worker, and revisit this option using backlog/latency and operational evidence. The baseline architecture diagrams remain the initial deployment.
+
 ### Transcript persistence decision
 
 Save readable text in SQL and commit transcript/completion together. Blob Storage can later hold retained raw JSON or exports referenced from SQL.
@@ -189,7 +212,7 @@ Routes identify runs explicitly; a file may eventually have multiple runs with d
 - Provision the six core services above. App Service also needs a hosting plan. Linking App Service behind Static Web Apps `/api` requires [Static Web Apps Standard](https://learn.microsoft.com/en-us/azure/static-web-apps/apis-app-service).
 - Choose one authentication path (frontend Entra tokens validated by the API, or a deliberately configured platform session). Configure tenant restrictions, scopes, ownership checks and the trusted ingress boundary; a fixed-user local session does not validate production identity behavior.
 - Use managed identities/RBAC where supported. Configure separate browser upload and Speech source-read authorization, Blob CORS and retention. Private objects require an explicitly supported access strategy; do not assume private network endpoints are necessary or sufficient for Speech access.
-- Configure Always On and restart recovery. Before multiple workers/instances, add SQL-backed leases, bounded concurrency and tests for competing claims. A separate worker service can be introduced if workload or availability requires it.
+- Configure Always On and restart recovery. Before multiple workers/instances, add SQL-backed leases, bounded concurrency and tests for competing claims. Consider the [Functions and Queue Storage option](#production-consideration-timer-and-queue-triggered-azure-functions) when independent background scaling is justified.
 - Validate Azure SQL schema/types, driver setup, transactions and concurrent claims against Azure SQL. SQLite/SQLAlchemy is a development boundary, not proof of equivalent locking behavior.
 - Verify Speech API version/options, duration/size enforcement, polling intervals and uncertain-submission reconciliation against the real service before enabling live jobs. The local mock's correlation lookup/deduplication is not an Azure guarantee.
 - Add Azure Monitor/Application Insights for request, dependency and worker failures, plus stalled-job alerts. Use Key Vault for remaining secrets when needed; keep credentials and audio/transcript contents out of logs.
