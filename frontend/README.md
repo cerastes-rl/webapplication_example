@@ -16,7 +16,9 @@ Start the [API](../README.md#run-the-api) , [storage mock](../README.md#run-the-
 
 - Session restoration or exact `austin`/`john` access-key sign-in. Sign-in opens Upload; History contains only that user's persisted records, initially empty.
 - TXT files, greater than zero and at most **1,000,000 bytes inclusive**. English; Automatic or 1–10 speakers; labels/timestamps default on. Options are saved for later processing.
+- Upload controls use audio terminology and display a 1 GB limit. The local mock still accepts only non-empty TXT fixtures up to 1,000,000 bytes inclusive, with generic format/size validation messages.
 - Begin upload creates a run, opens History, PUTs the File directly to storage via XHR, reports measured progress and HEAD-verifies completion through the API. The shell owns the request across internal navigation; a second transfer is disabled while one is active.
+- History shows refresh progress to the left of Refresh while loading. Upload progress appears in the top banner with a reminder to keep the application open, and disappears when the upload ends. Upload errors and cancellation notices remain beside Refresh.
 - History supports search, sorting, 10/25/50-row pages and Refresh. It loads on sign-in, entering History, after mutations and on Refresh; backend processing runs independently; automatic frontend refresh is deferred.
 - An inactive uploading/failed run offers Cancel. Restarting a transfer requires file reselection and a new submission. Partial uploads do not resume.
 - Sign-out confirms stopping an active transfer and requests cancellation before ending the session. Errors remain visible for retry. Browser reload warns during an active transfer; after reload the saved row remains in History and can be cancelled.

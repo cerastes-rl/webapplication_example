@@ -173,7 +173,7 @@ function App(): ReactNode {
     let id: number | null = null
     let sent = false
     setUpload({ controller, run_id: null, progress: 0 })
-    setNotice('Creating your upload record…')
+    setNotice('')
     try {
       const { run, upload_url, headers } = await authorizeUpload(file, settings, signal)
       if (signal.aborted || generation !== session.current) return
@@ -182,14 +182,13 @@ function App(): ReactNode {
       saveRun(run)
       setPage('history')
       refreshHistory()
-      setNotice('Uploading to local storage…')
       await putFile(file, upload_url, headers, signal, (progress) => {
         if (!signal.aborted && generation === session.current)
           setUpload({ controller, run_id: id, progress })
       })
       sent = true
       saveRun(await completeUpload(id, signal))
-      setNotice('File saved. Transcription has not started.')
+      setNotice('')
     } catch (error) {
       if (signal.aborted || generation !== session.current) return
       if (id !== null && !sent) {
@@ -250,6 +249,8 @@ function App(): ReactNode {
         onViewChange={setHistoryView}
         onUpload={() => navigate('upload')}
         onRefresh={refreshHistory}
+        loading={dataLoading}
+        notice={notice}
         onOpen={(id) => {
           setSelected(id)
           navigate('detail')
@@ -286,6 +287,12 @@ function App(): ReactNode {
       </a>
       <header className="topbar">
         <Brand />
+        <div className="upload-banner" role="status">
+          {signedIn && upload && <>
+            <strong>{upload.run_id === null ? 'Preparing upload…' : upload.progress === 100 ? 'Finalizing upload…' : `Uploading… ${upload.progress}%`}</strong>
+            <span>Keep the application open until the upload finishes.</span>
+          </>}
+        </div>
         <div className="header-right">
           <button
             className="theme-toggle"
@@ -362,11 +369,8 @@ function App(): ReactNode {
             </div>
           </aside>
           <main className="main-content" id="main" ref={main} tabIndex={-1}>
-            <div className="notification" role="status">
-              {notice}
-            </div>
+            {page !== 'history' && <div className="notification" role="status">{notice}</div>}
             {dataError && <div role="alert">{dataError} <button className="button secondary" onClick={refreshHistory}>Refresh</button></div>}
-            {dataLoading && <p role="status">Loading saved recordings…</p>}
             {renderPage()}
             <footer className="page-footer">
               <span>SSScribe version {APP_VERSION} · Development</span>

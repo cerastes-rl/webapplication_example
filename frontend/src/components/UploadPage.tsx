@@ -17,17 +17,17 @@ export function UploadPage({ onBegin, busy }: { onBegin: (file: File, settings: 
       return
     }
     if (!/\.txt$/i.test(next.name))
-      setError('Choose a TXT file for the local mock.')
+      setError('This file format is not supported.')
     else if (next.size === 0)
       setError('This file is empty. Please choose another recording.')
     else if (next.size > MAX_FILE_SIZE)
-      setError('This file exceeds the 1 MB local limit.')
+      setError('This file is too large to upload.')
     else setError('')
   }
   function submit(event: FormEvent) {
     event.preventDefault()
     if (!file) {
-      setError('Choose a TXT file before beginning.')
+      setError('Choose an audio file before beginning.')
       return
     }
     if (error) return
@@ -42,7 +42,7 @@ export function UploadPage({ onBegin, busy }: { onBegin: (file: File, settings: 
     <>
       <div className="page-heading">
         <div>
-          <h1>Upload a text file</h1>
+          <h1>Upload an audio file</h1>
         </div>
       </div>
       <div className="upload-layout">
@@ -51,26 +51,26 @@ export function UploadPage({ onBegin, busy }: { onBegin: (file: File, settings: 
             <div className="section-heading">
               <span className="step-number">1</span>
               <div>
-                <h2>Choose your text file</h2>
-                <p>Use a text fixture for the local mock.</p>
+                <h2>Choose your audio file</h2>
+                <p>Upload a recording to transcribe.</p>
               </div>
             </div>
             <div className={`file-picker ${error ? 'invalid' : ''}`}>
               <span className="upload-symbol">
                 <Icon name="upload" size={30} />
               </span>
-              <h3>{file ? file.name : 'Select a text file'}</h3>
+              <h3>{file ? file.name : 'Select an audio file'}</h3>
               <p>
                 {file
                   ? formatSize(file.size)
-                  : 'Choose a text file to get started.'}
+                  : 'Choose an audio file to get started.'}
               </p>
               <label className="button secondary file-button">
                 {file ? 'Change file' : 'Choose file'}
                 <input
                   type="file"
                   accept=".txt,text/plain"
-                  aria-label="Choose text file"
+                  aria-label="Choose audio file"
                   aria-describedby="file-guidance file-error"
                   onChange={(event) =>
                     validate(event.target.files?.[0] ?? null)
@@ -78,7 +78,7 @@ export function UploadPage({ onBegin, busy }: { onBegin: (file: File, settings: 
                 />
               </label>
               <small id="file-guidance">
-                TXT · Up to 1 MB
+                Up to 1 GB
               </small>
             </div>
             <p id="file-error" className="field-error" role="alert">
@@ -146,8 +146,8 @@ export function UploadPage({ onBegin, busy }: { onBegin: (file: File, settings: 
           <h2>Instructions</h2>
           <ol>
             <li>
-              <strong>Choose your text file</strong>
-              <span>Select a text file from your device.</span>
+              <strong>Choose your audio file</strong>
+              <span>Select an audio file from your device.</span>
             </li>
             <li>
               <strong>Transcription settings</strong>

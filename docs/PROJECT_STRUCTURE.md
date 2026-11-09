@@ -53,7 +53,7 @@ frontend/
 1. `App.tsx` restores the session or calls `api/auth.ts` from sign-in.
 2. After sign-in/restoration, `GET /api/runs` returns all owned rows. The frontend searches, sorts and slices pages locally. History reloads on entry, after mutations and on Refresh; Upload/details navigation does not reload it.
 3. Begin upload passes the File/options to the shell. `POST /api/uploads/authorize` inserts one run and returns a local blob URL using the original filename and headers.
-4. XHR sends bytes directly to storage, tracking measured progress. One shell-owned upload object contains its controller, numeric run ID and progress across navigation.
+4. XHR sends bytes directly to storage, tracking measured progress. One shell-owned upload object contains its controller, numeric run ID and progress across navigation. The top banner displays its progress and a reminder to keep the application open until the upload finishes.
 5. `POST /api/uploads/complete` HEAD-verifies size before setting upload completed / transcription not started. The background worker submits eligible runs, polls active jobs and imports succeeded transcripts.
 6. Cancellation aborts the local request, conditionally saves cancellation and asks storage to DELETE. Failed/interrupted uploads require reselection/new submissions.
 7. Completed transcript text is fetched separately and displayed/copied/downloaded verbatim.

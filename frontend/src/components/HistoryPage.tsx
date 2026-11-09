@@ -15,6 +15,8 @@ type HistoryPageProps = {
   onUpload: () => void
   onOpen: (id: number) => void
   upload: UploadProgress | null
+  loading: boolean
+  notice: string
   onRefresh: () => void
   onCancel: (id: number) => void
 }
@@ -27,6 +29,8 @@ export function HistoryPage({
   onOpen,
   upload,
   onRefresh,
+  loading,
+  notice,
   onCancel
 }: HistoryPageProps): ReactElement {
   const searchInput = useRef<HTMLInputElement>(null)
@@ -65,11 +69,17 @@ export function HistoryPage({
           <h1>Recording history</h1>
           <p>Track recording uploads, transcription progress and completed transcripts.</p>
         </div>
-        <button className="button secondary" onClick={onRefresh}>Refresh</button>
-        <button className="button primary" onClick={onUpload}>
-          <Icon name="upload" size={17} />
-          Upload recording
-        </button>
+        <div className="history-actions">
+          {notice && <span className="history-notice" role="status">{notice}</span>}
+          <div className="history-refresh">
+            {loading && <span className="history-loading" role="status">Refreshing saved recordings…</span>}
+            <button className="button secondary" onClick={onRefresh}>Refresh</button>
+          </div>
+          <button className="button primary" onClick={onUpload}>
+            <Icon name="upload" size={17} />
+            Upload recording
+          </button>
+        </div>
       </div>
       <div className="stats-grid">
         <div className="stat-card">

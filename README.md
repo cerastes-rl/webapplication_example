@@ -16,7 +16,7 @@ SSScribe is a local transcription workspace with Austin/John sign-in, persistent
 
 - Austin/John sign-in, session restoration, navy accents and light/dark themes.
 - Non-empty TXT mock files up to **1,000,000 bytes inclusive**; saved English, Automatic/1–10 speakers, labels and timestamp options.
-- Begin upload persists a run, sends bytes directly to storage with measured progress, then verifies stored size. The worker submits completed uploads to Speech and imports results. Navigation preserves the transfer.
+- Begin upload persists a run, sends bytes directly to storage with measured progress, then verifies stored size. The worker submits completed uploads to Speech and imports results. Navigation preserves the transfer. The top banner shows upload progress and reminds users to keep the application open until it finishes.
 - History reads only the signed-in user's SQLite records, with filename search, sorting, pagination, Refresh and details. Reload and API restart preserve records; API restart requires signing in again.
 - Cancel aborts the local transfer and persists cancellation. An interrupted or unconfirmed upload requires file reselection and a new submission.
 - Stored completed transcripts, when present, are fetched separately and displayed/copied/downloaded verbatim. Refresh History to see backend processing updates and open completed transcripts.
