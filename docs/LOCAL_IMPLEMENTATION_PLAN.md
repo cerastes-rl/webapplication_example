@@ -2,7 +2,7 @@
 
 ## Status and purpose
 
-**Connected application planned; integration follows explicit UI approval.** The current app is a React preview and a FastAPI health endpoint. A separate minimal `backend/speech_mock.py` now reads/writes local text files under `backend/data/blobs/`, with no HTTP storage dependency. Its job dictionary is in memory; the durable service architecture below remains planned. Approval of the architecture or this document does not by itself approve the UI.
+**Local authentication complete; user interaction review approved on 2026-11-09. Connected History and processing remain planned.** The current app combines a React preview with FastAPI health and Austin/John sign-in/me/sign-out endpoints. A separate minimal `backend/speech_mock.py` now reads/writes local text files under `backend/data/blobs/`, with no HTTP storage dependency. Its job dictionary is in memory; the durable service architecture below remains planned. Broader UI acceptance and approval remain pending; SQL persistence and ownership filtering are deferred.
 
 Build one usable local journey: sign in, upload a recording, follow durable progress, read a stored sample transcript, retry a processing failure and cancel an upload. Records and audio survive reloads and service restarts. Recognition is simulated and clearly labeled.
 
@@ -14,12 +14,12 @@ This is the delivery guide for M2 in [requirements](REQUIREMENTS.md). The [imple
 
 | Component | Local implementation | Owns | Azure equivalent | Implemented |
 |---|---|---|---|---|
-| Frontend | React/TypeScript/Vite, port 5173 | UI preview; typed API client and actual shell-owned upload remain planned | Static Web Apps | ✅ UI preview |
-| Application | FastAPI/Uvicorn, port 8000, one worker | Planned authentication, business rules, application SQL and background execution | App Service | ❌ Health endpoint only |
+| Frontend | React/TypeScript/Vite, port 5173 | UI preview and typed auth client; recording API client and actual shell-owned upload remain planned | Static Web Apps | ✅ UI preview + auth integration |
+| Application | FastAPI/Uvicorn, port 8000, one worker | Health and authentication; recording business rules, application SQL and background execution remain planned | App Service | ✅ Health + auth only |
 | Application database | Planned SQLite through SQLAlchemy | Runs, files, jobs, transcripts | Azure SQL Database | ❌ |
 | Storage mock | Planned separate FastAPI process, proposed port 8001 | Upload grants, streamed bytes, object metadata and partial cleanup | Private Blob Storage | ❌ |
 | Speech mock | `backend/speech_mock.py`, port 8002 | Timed text processing, local source/result files, status, paginated List Files and job expiry | Azure AI Speech | ✅ Standalone local-file mock |
-| Identity | Planned fixed-user adapter inside the application | Local session and ownership checks | Microsoft Entra ID | ❌ UI identity is simulated |
+| Identity | Fixed Austin/John adapter inside the application | Local session; SQL ownership checks remain planned | Microsoft Entra ID | ✅ Complete; user interaction review approved |
 
 The Speech mock currently uses `backend/data/blobs/` directly and keeps jobs in memory. It does not require the planned storage HTTP service. Durable jobs, service adapters and application integration remain planned.
 
@@ -59,9 +59,9 @@ Use Pydantic DTOs and a small typed frontend client. Return UTC timestamps, stab
 | Method and route | Behavior |
 |---|---|
 | `GET /api/health` | Existing 200 `{"status":"OK!"}`. |
-| `POST /api/auth/sign-in` | Establish the fixed development user's session. |
-| `GET /api/auth/me` | Return the current user; 401 without a valid session. |
-| `POST /api/auth/sign-out` | Revoke the session and clear its cookie. |
+| `POST /api/auth/sign-in` | Accept `{"access_key":"austin"}` or `{"access_key":"john"}` and establish that fixed user's session. Implemented. |
+| `GET /api/auth/me` | Return `{id, name}`; 401 without a valid session. Implemented. |
+| `POST /api/auth/sign-out` | Revoke the session and clear its cookie. Implemented. |
 | `GET /api/runs` | History including incomplete uploads, saved options, state and allowed actions. |
 | `GET /api/runs/{run_id}` | Details for exactly one run. |
 | `GET /api/runs/{run_id}/transcript` | Stored readable text and metadata; 409 until available. |
@@ -72,7 +72,7 @@ Use Pydantic DTOs and a small typed frontend client. Return UTC timestamps, stab
 
 Authorization requests include a client-generated request ID. Enforce uniqueness per owner so retrying a lost authorization response does not create another run. Verify repeated requests match the original metadata/options. Resume a lost completion response by fetching run state and repeating completion, not by automatically uploading again. Return a DTO with run ID, file ID, filename, declared/verified byte counts, options, timestamps, state, failure stage, attempt count and allowed actions. Keep object keys, grants and Speech IDs out of ordinary History/detail DTOs; grants appear only in the authorization response.
 
-Use an opaque HttpOnly, SameSite=Lax cookie and an in-memory session registry for local auth. Check same-origin browser mutations, use the Vite proxy for application requests, and document that this is a local authentication mock. Storage uses scoped grants rather than application cookies. Do not build a user-management system.
+Implemented in `backend/auth.py`: exact keys `austin` and `john` map to stable user IDs with those same values. An opaque HttpOnly, SameSite=Lax cookie (path `/api`) identifies an in-memory session. The frontend uses the Vite proxy, restores the session on load and handles invalid keys/backend outages. Sign-out resets shared preview state. Restarting FastAPI invalidates sessions. SQL owner filtering remains deferred; existing preview History is explicitly shared sample data. Storage uses scoped grants rather than application cookies. Do not build a user-management system.
 
 ### Application database
 
@@ -141,7 +141,7 @@ Implement and verify each slice before proceeding. Do not create a temporary sta
 | Slice | Deliverable | Evidence to proceed |
 |---|---|---|
 | 0. UI acceptance | Finish focused interaction tests and browser/keyboard/theme review; record explicit UI approval. | Existing UI accepted; lint/build/tests pass. |
-| 1. Persistent History and session | Data exclusions, SQLite models, fixed-user auth, run DTOs/routes, typed client and API-backed History/details. Seed labeled completed examples; add the retriable example when its source exists. | Refresh retains session/data; restart retains data; signed-out and other-owner reads fail; missing/incomplete transcript states work. |
+| 1. Persistent History (auth implemented) | Data exclusions, SQLite models, user-owned run DTOs/routes, recording API client and API-backed History/details. Seed labeled completed examples; add the retriable example when its source exists. | Refresh retains session/data; restart retains data; signed-out and other-owner reads fail; missing/incomplete transcript states work. |
 | 2. Real upload | Record connected policy; storage mock, authorization/idempotency, streaming, completion, shell progress, cancellation and upload reconciliation. | Stored bytes equal input; exact/over-limit checks; navigation preserves transfer; duplicate completion creates one job; lost completion/cancel/disconnect recover correctly. |
 | 3. Processing and retry | Durable Speech mock, adapters, supervised worker, result import and processing retry. | Upload reaches stored transcript; failure retries once; duplicate retry does not submit twice; mock checks source through HTTP. |
 | 4. Recovery and acceptance | Finish startup sweeps, uncertain-submit reconciliation, outage backoff, cleanup and full UI polling/error handling. | Restart each service during upload/processing/import; resume existing work without duplicate records/jobs/transcripts; complete the journey below. |
@@ -150,7 +150,7 @@ Introduce non-overlapping browser polling when active API-backed work first exis
 
 At sign-out, confirm cancellation of an active transfer, abort it and request cancellation while credentials remain valid, then revoke the session and clear protected state. If the API is unreachable, clear local protected state and report that cancellation/sign-out could not be confirmed; startup recovery reconciles persisted upload work. Processing continues independently of the browser.
 
-Use pytest with isolated temporary databases/storage and controlled clocks for backend/service checks, and Vitest/React Testing Library for core UI interactions. Prioritize boundaries: unauthorized access, actual bytes, races, retry, recovery and atomic import. Test injected small limits rather than allocating gigabyte files. Add a small real-HTTP integration check across all three Python services; HTTP stubs alone do not validate the service boundary.
+Current auth checks use standard-library unittest over real HTTP (`backend/.venv/bin/python -m unittest discover -s backend/tests -v` from the repository root), covering both users, cookies, invalid/forged credentials, sign-out, session replacement and restart. Add pytest with isolated temporary databases/storage and controlled clocks for future workflow/service checks, and Vitest/React Testing Library for core UI interactions. Prioritize boundaries: unauthorized access, actual bytes, races, retry, recovery and atomic import. Test injected small limits rather than allocating gigabyte files. Add a small real-HTTP integration check across all three Python services; HTTP stubs alone do not validate the service boundary.
 
 ## 7. Files, startup and completion
 

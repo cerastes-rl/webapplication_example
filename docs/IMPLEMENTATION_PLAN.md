@@ -2,9 +2,9 @@
 
 ## Status and delivery guide
 
-The React preview is implemented for review; the main FastAPI app exposes only `GET /api/health`. The standalone `backend/speech_mock.py` is also implemented: it processes local text files, writes retained results and exposes status/paginated file listings. See the [local component status table](LOCAL_IMPLEMENTATION_PLAN.md#1-small-local-architecture). UI acceptance and explicit UI approval remain pending. Backend integration follows that approval.
+The React preview is implemented for review; the main FastAPI app exposes health and implemented Austin/John sign-in/me/sign-out endpoints. The standalone `backend/speech_mock.py` is also implemented: it processes local text files, writes retained results and exposes status/paginated file listings. See the [local component status table](LOCAL_IMPLEMENTATION_PLAN.md#1-small-local-architecture). Local auth and UI session integration are complete; the user approved the auth interaction review on 2026-11-09. Broader UI acceptance and explicit UI approval remain pending for connected History/upload processing.
 
-This document describes the application architecture and Azure end state. Use the [local implementation plan](LOCAL_IMPLEMENTATION_PLAN.md) for the ordered local delivery slices, concrete mock contracts, recovery behavior and acceptance checks. Persistent reads and auth are delivered together, followed by upload, processing and recovery.
+This document describes the application architecture and Azure end state. Use the [local implementation plan](LOCAL_IMPLEMENTATION_PLAN.md) for the ordered local delivery slices, concrete mock contracts, recovery behavior and acceptance checks. Local auth was delivered first; persistent user-owned reads follow, then upload, processing and recovery.
 
 Use [requirements](REQUIREMENTS.md) for acceptance criteria and the [frontend guide](../frontend/README.md) for UI review. The [API flow diagrams](API_DATA_FLOW.md) explain service interactions; their proposed file routes are superseded locally by run-based routes.
 
@@ -176,7 +176,7 @@ Save readable text in SQL and commit transcript/completion together. Blob Storag
 
 **Requirements:** UI-01, UI-02, UI-06–UI-09.
 
-`App.tsx` owns the shell, History, navigation, mock identity, theme and lifecycle timer. `preview.ts` owns fixtures/transitions; `components.tsx` provides shared visuals. Review list hierarchy, long filenames, responsive scrolling and focus at 320px and desktop widths.
+`App.tsx` owns the shell, navigation, backend sign-in/session, shared preview state, theme and lifecycle timer. `components/SignInForm.tsx` renders sign-in; `components/HistoryPage.tsx` renders History. `preview.ts` owns fixtures/transitions; `components/` contains individual files for shared visuals, Upload and run details; `assets/` holds static images. Review list hierarchy, long filenames, responsive scrolling and focus at 320px and desktop widths.
 
 ## 2. Transcript details — implemented for review
 
@@ -188,19 +188,19 @@ Completed runs display shared sample text with speaker/timestamp presentation. I
 
 **Requirements:** UI-01–UI-05, UI-08–UI-09.
 
-Preserve current Upload validation, mock sign-in/out, retry/cancel, theme and simulation. Complete explicit missing-run, upload-failure and retry-failure scenarios as needed for UI-05. Check missing/empty/invalid/over-limit file, duplicate submission and sign-out during active simulation. Keep preview labeling clear.
+Preserve current Upload validation, backend sign-in/out, retry/cancel, theme and simulation. Complete explicit missing-run, upload-failure and retry-failure scenarios as needed for UI-05. Check missing/empty/invalid/over-limit file, duplicate submission and sign-out during active simulation. Keep preview labeling clear.
 
 ## 4. UI acceptance and approval
 
 Add focused interaction tests using Vitest, React Testing Library and a DOM environment. Add a documented test script with the tooling. Cover file validation, navigation/details, retry/cancel, sign-in/out, themes and scenario recovery.
 
-Complete keyboard, focus, announcements, contrast ≥4.5:1, reduced-motion, 320px/desktop and light/dark review. Run lint/build and the added tests. **Obtain explicit UI approval before backend integration.**
+Complete keyboard, focus, announcements, contrast ≥4.5:1, reduced-motion, 320px/desktop and light/dark review. Run lint/build and the added tests. **Local auth is complete and its interaction review was approved by the user on 2026-11-09. Obtain explicit UI approval before further connected History/upload integration.**
 
 ## Connected local delivery
 
 Follow the [local implementation plan](LOCAL_IMPLEMENTATION_PLAN.md#6-delivery-slices-and-checks):
 
-1. Persistent History and mock session, backed by SQLite from the first connected read.
+1. Persistent user-owned History, backed by SQLite from the first connected recording read. Local Austin/John sessions are already implemented.
 2. Actual direct upload, completion, cancellation and reconciliation.
 3. Durable Speech mock, background execution, transcript import and retry.
 4. Service restart/outage recovery and connected acceptance.

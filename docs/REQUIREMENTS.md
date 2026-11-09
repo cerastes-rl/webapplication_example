@@ -3,9 +3,9 @@
 ## Milestones
 
 - **M1 — UI preview:** implemented for review. React/TypeScript/Vite, navy branding, light/dark themes, Upload/History navigation, mock identity, simulated progress and sample details. Browser/accessibility review, focused tests and UI approval are the current acceptance tasks.
-- **Current backend:** `GET /api/health` → `{"status":"OK!"}`. Vite's `/api` proxy and dev-container ports 5173/8000 are configured.
+- **Current backend:** health plus Austin/John sign-in/me/sign-out with in-memory cookie sessions. Vite's `/api` proxy and dev-container ports 5173/8000 are configured.
 - **Standalone Speech mock — implemented:** local UTF-8 text input, timed states, retained result/report JSON, status and paginated List Files. Only in-memory jobs expire after 30 minutes; application integration and durable jobs remain planned. See the [component status table](LOCAL_IMPLEMENTATION_PLAN.md#1-small-local-architecture).
-- **M2 — connected local application:** planned after UI approval. FastAPI/SQLite own records and workflow state, a storage HTTP mock persists audio, and a Speech HTTP mock returns deterministic batch results. FastAPI lifespan loops query SQL and execute submission, monitoring, import and recovery logic.
+- **M2 — connected local application:** local authentication is complete, with user interaction approval recorded on 2026-11-09; SQL History/upload processing remains planned after UI approval. FastAPI/SQLite own records and workflow state, a storage HTTP mock persists audio, and a Speech HTTP mock returns deterministic batch results. FastAPI lifespan loops query SQL and execute submission, monitoring, import and recovery logic.
 - **P1 — follow-ups:** filename/status search, transcript copy/download and transcript search.
 
 Use the [local implementation plan](LOCAL_IMPLEMENTATION_PLAN.md) for delivery and local contracts, the [architecture plan](IMPLEMENTATION_PLAN.md) for the Azure end state, [UI research](UI_RESEARCH.md) for design rationale and [AGENTS.md](../AGENTS.md) for implementation conventions.
@@ -31,7 +31,7 @@ uploading -> cancelled
 failed fixture -> retry -> queued -> processing -> completed
 ```
 
-The shell ticks every 1.3 seconds, adding eight percentage points during uploading and advancing each later stage on successive ticks. Completed runs share sample text. Cancel is offered while uploading. Sign-out confirms cancellation of uploading/finalizing runs, hides records and pauses other simulation. Sign-in resumes it. Reload restores three completed fixtures, one failed fixture, default identity/page and form state. Theme persists separately.
+The shell ticks every 1.3 seconds, adding eight percentage points during uploading and advancing each later stage on successive ticks. Completed runs share sample text. Cancel is offered while uploading. Sign-out confirms cancellation of uploading/finalizing runs, hides records and pauses other simulation. Sign-in resumes it. Reload restores three completed fixtures, one failed fixture, default page/form state and identity from the backend session. Sign-out and each new sign-in reset the preview runs; these are shared samples, with SQL filtering deferred. Theme persists separately.
 
 A **run** represents one submission and saved options. In M2 create its stable ID before transfer, separate upload/run state from processing job state and preserve run/file/options on processing retry. Changed-option reprocessing creates a new run.
 
@@ -41,7 +41,7 @@ A **run** represents one submission and saved options. In M2 create its stable I
 
 | ID | Acceptance criteria | Current coverage |
 |---|---|---|
-| UI-01 | Clear preview/sample labeling, development sign-in/out, signed-out record privacy, persistent banner and navigation. | Implemented; starts signed in for review. |
+| UI-01 | Clear preview/sample labeling, Austin/John backend sign-in/out, signed-out record privacy, persistent banner and navigation. | Implemented; restores a backend session or shows the Austin/John access-key form. |
 | UI-02 | History metadata/options and uploading/finalizing/queued/processing/completed/failed/cancelled states with appropriate actions. | Implemented; active states follow Begin upload/retry. |
 | UI-03 | Dedicated Upload validates choice/format/size, saves options in memory, starts a simulated run, navigates to History and guards duplicate submission. | Validation/navigation/simulation implemented. Transfer-failure and server-pending scenarios remain acceptance work. |
 | UI-04 | Read-only sample transcript for completed runs, incomplete/error states, retry and Back to History. | Implemented with shared text and speaker/timestamp presentation. |
@@ -51,7 +51,7 @@ A **run** represents one submission and saved options. In M2 create its stable I
 | UI-08 | Typed fixtures/transitions separated from presentation, explicit preview labeling and selectable scenarios. | `preview.ts` owns fixtures/transitions; shell owns timer. Complete scenario controls during acceptance. |
 | UI-09 | SSScribe/navy branding, theme toggle on signed-in/out surfaces and stored theme preference. | Implemented; cross-theme review pending. |
 
-**M1 gate:** demonstrate UI-01–UI-09, close gaps or agree deferrals, complete browser/keyboard/responsive/theme review, add focused interaction tests, run lint/build and obtain explicit UI approval before M2.
+**M1 gate:** demonstrate UI-01–UI-09, close gaps or agree deferrals, complete browser/keyboard/responsive/theme review, add focused interaction tests, run lint/build and obtain explicit UI approval before further connected recording work. Austin/John authentication is complete; the user approved its interaction review on 2026-11-09.
 
 ## M2 — connected local requirements
 
@@ -60,10 +60,10 @@ A **run** represents one submission and saved options. In M2 create its stable I
 | ID | Acceptance criteria |
 |---|---|
 | API-01 | Small typed `/api` client, Pydantic request/response models, stable IDs, UTC timestamps and predictable errors. Proposed envelope: `{"error":{"code":"…","message":"…"}}`. API failures render actionable errors. Preserve health response. |
-| AUTH-01 | Fixed-user adapter inside FastAPI with sign-in/me/sign-out. Protect recording/upload/transcript/retry/cancel with credentials/ownership checks and 401 when signed out. Refresh restores the active session; a backend restart may require local sign-in again. Sign-out handles active transfer, clears protected views and stops UI polling; backend work continues. |
+| AUTH-01 | Local auth complete; user interaction review approved on 2026-11-09. Two fixed users, `austin` and `john`, whose access keys equal their IDs, plus FastAPI sign-in/me/sign-out and an HttpOnly cookie session. Planned with SQL: protect recording/upload/transcript/retry/cancel using the session user ID and ownership checks, with 401 when signed out. Refresh restores the active session; a backend restart may require local sign-in again. Sign-out handles active transfer, clears protected views and stops UI polling; backend work continues. |
 | API-02 | OpenAPI contracts for reads, authorization, streamed transfer, completion, retry and cancellation. Include run ID/options/upload state so unfinished submissions are visible. Storage keys and external Speech IDs remain private metadata. |
 
-Health is implemented. The [local plan](LOCAL_IMPLEMENTATION_PLAN.md#3-contracts-and-durable-state) defines the planned run-based contracts:
+Health and local auth are implemented. The [local plan](LOCAL_IMPLEMENTATION_PLAN.md#3-contracts-and-durable-state) defines the planned run-based contracts:
 
 | Method / route | Response and behavior |
 |---|---|
@@ -75,7 +75,7 @@ Health is implemented. The [local plan](LOCAL_IMPLEMENTATION_PLAN.md#3-contracts
 | Storage upload URL, route pending | Raw streamed transfer to the separate storage mock. Proposed 204 stored, 404 unknown authorization, 413 oversized, 415 unsupported type. Validate actual bytes/claimed length. |
 | `POST /api/uploads/complete` | 202 verifies stored bytes, finalizes existing run/file and creates one ready SQL job. Missing/incomplete bytes: 409. Repeated confirmation returns the same IDs/current state across restarts. |
 | `POST /api/runs/{run_id}/retry` | 202 marks eligible failed processing ready with the same recording/options. Unknown: 404; wrong state/concurrent duplicate: 409. |
-| `/api/auth/sign-in`, `/api/auth/me`, `/api/auth/sign-out` | Proposed POST/GET/POST routes for the local fixed-user session. |
+| `/api/auth/sign-in`, `/api/auth/me`, `/api/auth/sign-out` | Implemented POST/GET/POST routes for Austin/John sessions. Sign-in accepts `{"access_key":"austin"}` or `{"access_key":"john"}`. |
 | `POST /api/runs/{run_id}/cancel` | Cancel uploading/finalizing work before readiness; persist cancellation and clean partials/abandoned objects. Reconcile interrupted transfers before starting a new submission with reselection. |
 
 ### Transfer and persistence

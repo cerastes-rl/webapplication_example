@@ -1,11 +1,11 @@
 # SSScribe — Transcription workspace
 
-SSScribe is a React UI preview for submitting recordings, following simulated progress and reading sample transcripts. It uses navy-blue accents, light/dark themes and a fixed development identity. Preview runs live in browser memory; theme preference persists in localStorage.
+SSScribe is a React UI preview for submitting recordings, following simulated progress and reading sample transcripts. It uses navy-blue accents, light/dark themes and local Austin/John authentication. Preview runs live in browser memory; theme preference persists in localStorage.
 
 ## Documentation
 
 - [Project structure](docs/PROJECT_STRUCTURE.md): maintained files, responsibilities and editing guide.
-- [Frontend guide](frontend/README.md): controls, scenarios and manual review checklist.
+- [Frontend guide](frontend/README.md): controls, scenarios, manual review and the [source layout](frontend/README.md#source-layout).
 - [Requirements](docs/REQUIREMENTS.md): current coverage and acceptance criteria.
 - [Architecture and end-state plan](docs/IMPLEMENTATION_PLAN.md): service boundaries, Azure deployment and architecture diagrams.
 - [Local implementation plan](docs/LOCAL_IMPLEMENTATION_PLAN.md): minimal connected delivery slices, contracts, recovery and acceptance checks.
@@ -15,16 +15,16 @@ SSScribe is a React UI preview for submitting recordings, following simulated pr
 
 ## Current capabilities
 
-- Persistent SSScribe banner, Upload/History navigation, development user and mock sign-in/out. The preview starts signed in on History.
+- Persistent SSScribe banner, Upload/History navigation and backend sign-in/out. Enter `austin` or `john` as the access key; existing sessions are restored on load.
 - MP3/WAV picker with extension and size validation: non-empty files up to **4 GB (4,000,000,000 bytes inclusive)**.
 - Requested speakers: Automatic or 1–10. Language: English. Speaker labels and timestamps default on.
 - Begin upload creates an in-memory Run ID and navigates to History. Simulated progress continues across internal navigation: uploading → finalizing → queued → processing → completed.
 - History includes three completed fixtures and one retriable failure, saved options, status, open/retry/cancel actions and sample transcript details.
 - Preview controls for normal, empty, error and loading History states.
-- Sign-out hides records, confirms cancellation of active simulated transfers and pauses the remaining simulation. Sign-in resumes it.
+- Sign-out confirms cancellation of active simulated transfers, revokes the backend session and clears the preview workspace. Each sign-in starts fresh shared sample runs; SQL ownership filtering is planned.
 - Theme toggle, responsive layout, scrollable History table, labeled controls, skip link, focus styles and reduced-motion support.
 
-Reloading restores the initial runs, navigation, form and mock identity. All completed runs use the shared sample transcript. Browser, keyboard, responsive and accessibility review remains the current acceptance task.
+Reloading restores initial preview runs, navigation and form, then checks the backend session to restore identity. All completed runs use the shared sample transcript. Browser, keyboard, responsive and accessibility review remains the current acceptance task.
 
 ## Run the UI
 
@@ -36,19 +36,20 @@ pnpm install                     # first run / dependency changes
 pnpm dev --host 0.0.0.0 --port 5173 --strictPort
 ```
 
-Open **http://localhost:5173**. Check existing VS Code tasks/dev-container startup before launching servers. Vite's `/api` proxy targets `http://localhost:8000` for the connected milestone.
+Open **http://localhost:5173**. Check existing VS Code tasks/dev-container startup before launching servers. Start the API below for sign-in. Vite's `/api` proxy targets `http://localhost:8000`.
 
 ### Checks
 
 ```bash
 cd frontend
 pnpm lint
+pnpm test:auth                   # auth-client tests; no extra dependencies
 pnpm build                       # TypeScript check + Vite production build
 ```
 
 Application interaction tests are a planned acceptance task. Use the [frontend checklist](frontend/README.md#checks) for manual review.
 
-## Run the health API
+## Run the API
 
 ```bash
 cd backend
@@ -60,12 +61,23 @@ python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 - `GET http://localhost:8000/api/health` → `{"status":"OK!"}`.
 - FastAPI OpenAPI UI: http://localhost:8000/docs.
+- `POST /api/auth/sign-in` with `{"access_key":"austin"}` or `{"access_key":"john"}` returns the user and sets an HttpOnly session cookie.
+- `GET /api/auth/me` restores the user; signed-out/unknown sessions return 401.
+- `POST /api/auth/sign-out` revokes the session and clears the cookie.
 
-The dev container forwards 5173/8000. On container creation, `postCreateCommand` creates/reuses `backend/.venv` and installs `backend/requirements.txt`. Rebuild the container to apply setup changes. After dependency changes, run `backend/.venv/bin/python -m pip install -r backend/requirements.txt` from the repository root.
+Use one Uvicorn worker. Sessions live in memory: browser refresh preserves sign-in, while restarting the API requires signing in again. The UI shows shared preview records for both users. Run/file ownership will be enforced through SQL later.
 
-`.vscode/tasks.json` defines folder-open startup tasks. `.devcontainer/start-dev.sh` checks ports before starting servers and writes logs under `.devcontainer/logs/`. It installs Python requirements when creating a missing venv; update existing environments explicitly. Install frontend dependencies with pnpm.
+Run backend auth checks from the repository root:
 
-See the [project structure guide](docs/PROJECT_STRUCTURE.md) for the source tree and editing map.
+```bash
+backend/.venv/bin/python -m unittest discover -s backend/tests -v
+```
+
+The dev container forwards 5173/8000/8002. On container creation, `postCreateCommand` creates/reuses `backend/.venv` and installs `backend/requirements.txt`. Rebuild the container to apply setup changes. After dependency changes, run `backend/.venv/bin/python -m pip install -r backend/requirements.txt` from the repository root.
+
+`.vscode/tasks.json` defines folder-open startup tasks for Vite, the main FastAPI app and the Speech mock. You can also run **Start Speech Mock** from VS Code's Run Task menu. `.devcontainer/start-dev.sh` starts missing services and writes logs under `.devcontainer/logs/`, including `speech-mock.log`. It installs Python requirements when creating a missing venv; update existing environments explicitly. Install frontend dependencies with pnpm.
+
+See the [project structure guide](docs/PROJECT_STRUCTURE.md) for the source tree and editing map. Frontend UI components live in `src/components/`, static images in `src/assets/` and auth requests in `src/api/`; `App.tsx` coordinates shared state and navigation.
 
 ## Run the standalone Speech mock
 
@@ -74,7 +86,7 @@ cd backend
 .venv/bin/python -m uvicorn speech_mock:app --host 127.0.0.1 --port 8002
 ```
 
-Open http://localhost:8002/docs (forward port 8002 manually when using the dev container). This standalone mock reads/writes local files; it needs no storage service. Paths are relative to `backend/` and must stay under `data/blobs/`. A leading slash is optional and still means a backend-relative mock path.
+Open http://localhost:8002/docs. Port 8002 is included in dev-container forwarding; rebuild the container to apply configuration changes. The Speech startup task runs without reload so code edits do not reset in-memory jobs; restart the task to apply Speech code changes. This standalone mock reads/writes local files; it needs no storage service. Paths are relative to `backend/` and must stay under `data/blobs/`. A leading slash is optional and still means a backend-relative mock path.
 
 Ready-to-use UTF-8 text fixtures are in `backend/data/blobs/audio/`: `example.txt` and `example1.txt` through `example5.txt`. For example:
 
@@ -99,7 +111,7 @@ A maintenance loop advances jobs without polling and removes only terminal job e
 
 ## Planned connected application
 
-**Approve the UI before backend integration.** Follow the [local implementation plan](docs/LOCAL_IMPLEMENTATION_PLAN.md) for delivery and its [component status table](docs/LOCAL_IMPLEMENTATION_PLAN.md#1-small-local-architecture) for what is implemented. The connected milestone makes FastAPI/SQLite authoritative for runs, status and transcripts, with actual audio stored by a separate HTTP storage mock. A separate Speech API mock produces deterministic batch results.
+**Local auth is complete and its interaction review was approved by the user on 2026-11-09; broader UI acceptance and connected History/upload integration remain pending.** Follow the [local implementation plan](docs/LOCAL_IMPLEMENTATION_PLAN.md) for delivery and its [component status table](docs/LOCAL_IMPLEMENTATION_PLAN.md#1-small-local-architecture) for what is implemented. The connected milestone makes FastAPI/SQLite authoritative for runs, status and transcripts, with actual audio stored by a separate HTTP storage mock. A separate Speech API mock produces deterministic batch results.
 
 FastAPI hosts request handlers and lifespan-managed background loops. SQL stores workflow state, claims, Speech IDs, next-action times, errors and unfinished imports. Loops query due rows, submit jobs, poll Speech, import results and recover interrupted work.
 

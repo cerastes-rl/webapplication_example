@@ -23,20 +23,29 @@ if ! curl -fsS http://localhost:5173/ >/dev/null 2>&1; then
     echo "Started Vite"
 fi
 
+# Both Python services share the backend virtual environment.
+cd "$ROOT/backend"
+if [ ! -x ".venv/bin/python" ]; then
+    echo "Creating Python virtual environment..."
+    python -m venv .venv
+    .venv/bin/python -m pip install -r requirements.txt
+fi
+
 # Start Python + FastAPI
 if ! curl -fsS http://localhost:8000/api/health >/dev/null 2>&1; then
-    cd "$ROOT/backend"
-
-    # Ensure the virtual environment exists
-    if [ ! -x ".venv/bin/python" ]; then
-        echo "Creating Python virtual environment..."
-        python -m venv .venv
-        .venv/bin/python -m pip install -r requirements.txt
-    fi
 
     nohup .venv/bin/python -m uvicorn main:app \
         --reload --host 0.0.0.0 --port 8000 \
         > "$LOGS/uvicorn.log" 2>&1 < /dev/null &
 
     echo "Started Uvicorn"
+fi
+
+# Start the standalone Speech mock (one worker, without reload).
+if ! curl -fsS http://localhost:8002/openapi.json >/dev/null 2>&1; then
+    nohup .venv/bin/python -m uvicorn speech_mock:app \
+        --host 0.0.0.0 --port 8002 \
+        > "$LOGS/speech-mock.log" 2>&1 < /dev/null &
+
+    echo "Started Speech mock"
 fi

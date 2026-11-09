@@ -15,17 +15,17 @@ Build a working local mock of an authenticated speech-to-text application. Prior
 
 ## Current milestone
 
-The UI preview is implemented for review. It starts signed in as the development user on History, with navy accents, light/dark themes, a persistent banner, Upload/History navigation, simulated runs and sample transcript details.
+The UI preview is implemented for review. It restores an Austin/John backend session or opens the access-key sign-in form, with navy accents, light/dark themes, a persistent banner, Upload/History navigation, simulated runs and sample transcript details.
 
 - `frontend/src/preview.ts`: typed fixtures, sample text and transitions.
-- `App.tsx`: shell, navigation, theme, mock session, History and timer.
-- `components.tsx`: shared visuals, Upload and details.
-- Reload resets runs, form, navigation and mock identity. Theme persists under `ssscribe-theme` when localStorage is available.
-- Simulation continues across internal navigation and pauses while signed out.
+- `App.tsx`: shell, navigation, theme, backend session/sign-in, preview state and timer. `components/SignInForm.tsx` renders sign-in; `components/HistoryPage.tsx` renders History. `src/api/auth.ts` owns typed auth calls.
+- `frontend/src/components/`: one file per UI component, including shared visuals, Upload and run details. Keep static images in `src/assets/`, request clients in `src/api/` and app coordination in `App.tsx`. Keep folders shallow and use idiomatic React/TypeScript. Keep teaching explanations in conversation; questions about traces do not by themselves authorize refactors. See `frontend/README.md#source-layout`.
+- Reload resets preview runs, form and navigation, then restores identity through `/api/auth/me`. Sign-out and each new sign-in reset preview runs. Theme persists under `ssscribe-theme` when localStorage is available.
+- Simulation continues across internal navigation and pauses while signed out or an auth request is pending. History remains shared sample data; SQL user filtering is deferred.
 - The picker accepts non-empty MP3/WAV up to **4,000,000,000 bytes inclusive**, checking extension and size. Requested speakers are Automatic or 1–10, language English, speaker labels/timestamps default on.
-- FastAPI currently exposes `GET /api/health` → `{"status":"OK!"}`.
+- Main FastAPI exposes health plus `/api/auth/sign-in`, `/api/auth/me` and `/api/auth/sign-out`. Access keys and stable IDs are exactly `austin` and `john`; sessions are in memory with an HttpOnly cookie. Restart requires sign-in. `backend/auth.py` exposes `get_current_user` for future SQL ownership checks.
 
-Browser/accessibility review, focused interaction tests and UI approval are the current acceptance tasks. **Obtain explicit UI approval before backend integration.**
+Browser/accessibility review, focused interaction tests and UI approval are the current acceptance tasks. **Local Austin/John auth is complete; the user approved its interaction review on 2026-11-09. Broader UI acceptance remains pending. Obtain explicit UI approval before further connected History/upload integration.**
 
 ## Planned connected architecture
 
@@ -88,6 +88,15 @@ Processing retry retains run/file/options; reprocessing with changed settings cr
 Use accessible controls, navy accents, light/dark theme tokens and responsive layouts. Keep typed data/transitions separate from rendering. Poll conservatively while active jobs exist and stop on sign-out or when work is terminal. Add focused tests for auth/contracts, streamed bytes, transitions, retry/cancel, restart recovery and core UI interactions as those features are delivered.
 
 The connected acceptance journey covers sign-in, History, actual upload, queued/processing/completed states, stored transcript, failed-job retry, cancellation and persistence across reload/restart. Keep startup, mock behavior and recovery instructions current.
+
+## Sequence diagrams and explanations
+
+- Use one Mermaid `sequenceDiagram` for the complete requested flow, including related entry points such as sign-in and page refresh/session restoration.
+- Split phases inside that diagram with clearly labeled `Note over` sections (for example, `PART 1 - Page load or refresh` and `PART 2 - Manual sign-in`). Use `autonumber`, descriptive participants and `alt`/`opt` branches for success, errors and conditional actions.
+- Trace the actual function calls, helpers, HTTP requests/proxy routing, backend handlers, state/session changes and return paths. Distinguish implemented behavior from planned work.
+- Follow the diagram with a compact table linking components/functions to their current source files and line numbers. Read the code first to verify those references.
+- Present the diagram in a fenced `mermaid` block in chat. Keep a single combined diagram unless the user requests otherwise.
+- Explain unfamiliar frontend concepts patiently in conversation, using concrete code references. Keep the implementation idiomatic and consistent with the existing React/TypeScript template; an explanation request is not a refactoring request.
 
 ## Documentation maintenance
 

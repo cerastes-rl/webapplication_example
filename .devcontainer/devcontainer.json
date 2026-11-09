@@ -18,7 +18,7 @@
 
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	// "forwardPorts": [],
-	"forwardPorts": [5173, 8000],
+	"forwardPorts": [5173, 8000, 8002],
 
 	// Create/reuse the backend virtual environment and install dependencies on container creation.
 	"postCreateCommand": "python -m venv backend/.venv && backend/.venv/bin/python -m pip install -r backend/requirements.txt",

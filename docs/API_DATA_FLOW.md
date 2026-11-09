@@ -1,6 +1,6 @@
 # End-state API calls and data flow
 
-**Planned application.** Backend integration follows UI approval. These diagrams are an architecture reference, not the local implementation checklist. Follow the [local implementation plan](LOCAL_IMPLEMENTATION_PLAN.md) for concrete contracts and delivery order. Its `/api/runs/{run_id}` reads/retry/cancel routes replace the proposed file-based routes below; upload IDs still identify transfers. Local interrupted transfers restart as new submissions after reconciliation. The mock correlation lookup used for uncertain submissions is local-only and requires a verified replacement for Azure.
+**Planned recording workflow.** Austin/John authentication is implemented as separately requested; connected History/upload processing still follows UI approval. These diagrams are an architecture reference, not the local implementation checklist. Follow the [local implementation plan](LOCAL_IMPLEMENTATION_PLAN.md) for concrete contracts and delivery order. Its `/api/runs/{run_id}` reads/retry/cancel routes replace the proposed file-based routes below; upload IDs still identify transfers. Local interrupted transfers restart as new submissions after reconciliation. The mock correlation lookup used for uncertain submissions is local-only and requires a verified replacement for Azure.
 
 FastAPI hosts HTTP routes and lifespan-managed background loops. SQL stores durable workflow state; loops query due rows to execute business functions.
 
@@ -165,9 +165,9 @@ Retry preserves recording/options and starts a new submission attempt through di
 | Explicit operation | Caller → receiver | Trigger / data flow |
 |---|---|---|
 | Sign-in/token acquisition | React identity adapter → Entra ID | User signs in through the chosen identity library. Configure registration/scopes and credential transport to FastAPI. Session details remain open. |
-| Mock `POST /api/auth/sign-in` | React → FastAPI fixed-user adapter | Local user sign-in establishes a fixed-user session. |
-| Mock `GET /api/auth/me` | React → FastAPI | Startup/session restoration and after mock sign-in, before protected reads. |
-| Mock `POST /api/auth/sign-out` | React → FastAPI | User sign-out after handling active upload cancellation. Clear protected UI and stop UI polling. Backend jobs continue. |
+| Mock `POST /api/auth/sign-in` | React → FastAPI fixed-user adapter | Implemented: `{"access_key":"austin"}` or `{"access_key":"john"}` establishes an in-memory session identified by an HttpOnly cookie. |
+| Mock `GET /api/auth/me` | React → FastAPI | Implemented startup session restoration; returns `{id, name}` or 401. Recording ownership checks follow with SQL. |
+| Mock `POST /api/auth/sign-out` | React → FastAPI | Implemented local sign-out after handling active simulated transfer cancellation. Revoke the session and reset preview state. Future backend jobs continue independently. |
 | Credential and ownership validation | FastAPI middleware/dependencies | Every protected request validates credentials and record ownership. |
 | Cancel/report upload failure (route **TBD**) | React → FastAPI → SQL | User cancels, known transfer failure or sign-out during transfer. Abort transfer and persist cancelled/failed stage. Scheduled recovery covers interruptions missed by browser-close notifications. |
 | **Get Blob Properties** — `HEAD` object URL | FastAPI routes/recovery loop → Blob | After upload completion request, or scheduled safe reconciliation of stale uploads. Validate actual stored bytes before marking work ready. |
