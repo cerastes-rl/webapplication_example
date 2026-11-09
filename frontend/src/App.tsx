@@ -370,7 +370,7 @@ function App(): ReactNode {
           </aside>
           <main className="main-content" id="main" ref={main} tabIndex={-1}>
             {page !== 'history' && <div className="notification" role="status">{notice}</div>}
-            {dataError && <div role="alert">{dataError} <button className="button secondary" onClick={refreshHistory}>Refresh</button></div>}
+            {dataError && <div role="alert">{dataError} {page !== 'history' && <button className="button secondary" onClick={refreshHistory}>Refresh</button>}</div>}
             {renderPage()}
             <footer className="page-footer">
               <span>SSScribe version {APP_VERSION} · Development</span>

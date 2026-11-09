@@ -20,7 +20,9 @@ async function request<T>(path: string, body?: unknown, signal?: AbortSignal): P
     if (signal?.aborted) throw error
     throw new Error('Cannot reach the app API. Start it and try again.')
   }
-  const result = await response.json()
+  const result = await response.json().catch(() => {
+    throw new Error('Could not complete the request. Check the API logs and try again.')
+  })
   if (!response.ok) throw new Error(result.error?.message ?? 'The request failed. Try again.')
   return result as T
 }
