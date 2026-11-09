@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { formatDate, formatSize, getRunStatuses } from '../run'
+import { formatDate, formatSize } from '../run'
 import type { Run } from '../run'
 import { EmptyState } from './EmptyState'
 import { StatusBadge } from './StatusBadge'
@@ -7,12 +7,12 @@ import { StatusBadge } from './StatusBadge'
 export function RunDetail({
   run,
   onBack,
-  onRetry,
+  progress,
   onCancel
 }: {
   run: Run
   onBack: () => void
-  onRetry: () => void
+  progress?: number
   onCancel: () => void
 }) {
   const transcript = run.transcript ?? ''
@@ -41,17 +41,23 @@ export function RunDetail({
       setExportMessage('Could not download the transcript. Please try again.')
     }
   }
-  const statuses = getRunStatuses(run)
-  const stateMessages = {
-    uploading: ['Uploading recording', `Upload is ${run.progress}% complete.`],
-    finalizing: ['Finalizing upload', 'The recording is being prepared for transcription.'],
-    queued: ['Transcription queued', 'Transcription will begin when the recording is ready to process.'],
-    processing: ['Transcription in progress', 'The transcript will appear here when processing completes.'],
-    failed: ['Transcription failed', run.error ?? 'Transcription could not finish. Retry to process this recording again.'],
-    cancelled: ['Upload cancelled', 'Select the recording again on the Upload page to start a new upload.'],
-    completed: ['Transcript ready', '']
+  const uploadMessages = {
+    uploading: ['Uploading file', progress === undefined ? 'This upload did not finish. Select the file again to start a new run.' : `${progress}% sent to storage.`],
+    completed: ['File saved', ''],
+    failed: ['Upload failed', run.error_message ?? 'Select the file again to start a new upload.'],
+    cancelled: ['Upload cancelled', 'Select the file again to start a new upload.']
   }
-  const [stateTitle, stateDescription] = stateMessages[run.status]
+  const transcriptionMessages = {
+    not_started: ['Transcription not started', ''],
+    queued: ['Transcription queued', 'Speech has accepted the job and has not started processing it yet.'],
+    running: ['Transcription in progress', 'The transcript will appear here when processing completes.'],
+    importing: ['Importing transcript', ''],
+    completed: ['Transcript ready', ''],
+    failed: ['Transcription failed', run.error_message ?? 'Transcription could not finish.'],
+    submission_uncertain: ['Submission uncertain', run.error_message ?? 'The submission could not be confirmed.']
+  }
+  const [stateTitle, stateDescription] = run.upload_stage === 'completed'
+    ? transcriptionMessages[run.transcription_stage] : uploadMessages[run.upload_stage]
   return (
     <>
       <button className="back-button" onClick={onBack}>
@@ -59,11 +65,11 @@ export function RunDetail({
       </button>
       <div className="page-heading">
         <div>
-          <span className="eyebrow">{run.id}</span>
+          <span className="eyebrow">{run.run_id}</span>
           <h1 className="filename-heading">{run.filename}</h1>
           <p>
-            {formatDate(run.created)} <span className="dot-separator">·</span>{' '}
-            {formatSize(run.size)}
+            {formatDate(run.created_at)} <span className="dot-separator">·</span>{' '}
+            {formatSize(run.size_bytes)}
           </p>
         </div>
       </div>
@@ -71,7 +77,7 @@ export function RunDetail({
         <section className="panel transcript-panel">
           <div className="panel-title">
             <h2>Transcript</h2>
-            {run.status === 'completed' && (
+            {run.transcription_stage === 'completed' && (
               <div className="transcript-actions">
                 <p className="export-message" role="status">{exportMessage}</p>
                 <button className="button secondary" onClick={copyTranscript}>Copy</button>
@@ -79,59 +85,47 @@ export function RunDetail({
               </div>
             )}
           </div>
-          {run.status === 'completed' ? (
+          {run.transcription_stage === 'completed' ? (
             <pre className="transcript">{transcript}</pre>
           ) : (
             <EmptyState title={stateTitle}>
               {stateDescription}
             </EmptyState>
           )}
-          {run.status === 'uploading' && (
+          {['uploading', 'failed'].includes(run.upload_stage) && (
             <div className="detail-progress">
-              <progress
-                max={100}
-                value={run.progress}
-                aria-label="Upload progress"
-              />
+              {progress !== undefined && <progress max={100} value={progress} aria-label="Upload progress" />}
               <button className="button secondary" onClick={onCancel}>
                 Cancel upload
               </button>
             </div>
           )}
-          {run.status === 'failed' && (
-            <div className="detail-progress">
-              <button className="button primary" onClick={onRetry}>
-                Retry
-              </button>
-            </div>
-          )}
+
         </section>
         <aside className="panel settings-panel">
           <h2>Recording details</h2>
           <dl>
             <dt>Run ID</dt>
-            <dd className="mono">{run.id}</dd>
+            <dd className="mono">{run.run_id}</dd>
             <dt>Upload status</dt>
-            <dd><StatusBadge status={statuses.upload} /></dd>
+            <dd><StatusBadge status={progress === 100 ? 'finalizing' : run.upload_stage} /></dd>
             <dt>Transcription status</dt>
-            <dd><StatusBadge status={statuses.transcription} /></dd>
+            <dd><StatusBadge status={run.transcription_stage} /></dd>
             <dt>Submitted</dt>
-            <dd>{formatDate(run.created)}</dd>
+            <dd>{formatDate(run.created_at)}</dd>
             <dt>File size</dt>
-            <dd>{formatSize(run.size)}</dd>
-            <dt>Processing attempts</dt>
-            <dd>{run.attempts}</dd>
+            <dd>{formatSize(run.size_bytes)}</dd>
           </dl>
           <h2 className="settings-heading">Transcription settings</h2>
           <dl>
             <dt>Number of speakers</dt>
-            <dd>{run.speakers ?? 'Automatic'}</dd>
+            <dd>{run.requested_speakers ?? 'Automatic'}</dd>
             <dt>Language</dt>
-            <dd>{run.language}</dd>
+            <dd>{run.language === 'en-US' ? 'English' : run.language}</dd>
             <dt>Speaker labels</dt>
-            <dd>{run.labels ? 'Enabled' : 'Disabled'}</dd>
+            <dd>{run.include_speaker_labels ? 'Enabled' : 'Disabled'}</dd>
             <dt>Timestamps</dt>
-            <dd>{run.timestamps ? 'Enabled' : 'Disabled'}</dd>
+            <dd>{run.include_timestamps ? 'Enabled' : 'Disabled'}</dd>
           </dl>
         </aside>
       </div>

@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { formatSize, MAX_FILE_SIZE } from '../run'
-import type { Run } from '../run'
+import type { UploadSettings } from '../api/recordings'
 import { Icon } from './Icon'
 
-export function UploadPage({ onBegin }: { onBegin: (run: Run) => void }) {
+export function UploadPage({ onBegin, busy }: { onBegin: (file: File, settings: UploadSettings) => void; busy: boolean }) {
   const [file, setFile] = useState<File | null>(null)
   const [speakers, setSpeakers] = useState('auto')
   const [labels, setLabels] = useState(true)
@@ -16,40 +16,33 @@ export function UploadPage({ onBegin }: { onBegin: (run: Run) => void }) {
       setError('')
       return
     }
-    if (!/\.(mp3|wav|txt)$/i.test(next.name))
-      setError('Choose an MP3 or WAV audio file.')
+    if (!/\.txt$/i.test(next.name))
+      setError('Choose a TXT file for the local mock.')
     else if (next.size === 0)
       setError('This file is empty. Please choose another recording.')
     else if (next.size > MAX_FILE_SIZE)
-      setError('This file exceeds the 1 GB limit.')
+      setError('This file exceeds the 1 MB local limit.')
     else setError('')
   }
   function submit(event: FormEvent) {
     event.preventDefault()
     if (!file) {
-      setError('Choose an audio file before beginning.')
+      setError('Choose a TXT file before beginning.')
       return
     }
     if (error) return
-    onBegin({
-      id: `RUN-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
-      filename: file.name,
-      size: file.size,
-      created: new Date().toISOString(),
-      speakers: speakers === 'auto' ? null : Number(speakers),
-      language: 'English',
-      labels,
-      timestamps,
-      status: 'uploading',
-      progress: 0,
-      attempts: 1
+    if (busy) return
+    onBegin(file, {
+      requested_speakers: speakers === 'auto' ? null : Number(speakers),
+      include_speaker_labels: labels,
+      include_timestamps: timestamps
     })
   }
   return (
     <>
       <div className="page-heading">
         <div>
-          <h1>Upload a recording</h1>
+          <h1>Upload a text file</h1>
         </div>
       </div>
       <div className="upload-layout">
@@ -58,26 +51,26 @@ export function UploadPage({ onBegin }: { onBegin: (run: Run) => void }) {
             <div className="section-heading">
               <span className="step-number">1</span>
               <div>
-                <h2>Choose your audio</h2>
-                <p>Start with a recording from your device.</p>
+                <h2>Choose your text file</h2>
+                <p>Use a text fixture for the local mock.</p>
               </div>
             </div>
             <div className={`file-picker ${error ? 'invalid' : ''}`}>
               <span className="upload-symbol">
                 <Icon name="upload" size={30} />
               </span>
-              <h3>{file ? file.name : 'Select a recording'}</h3>
+              <h3>{file ? file.name : 'Select a text file'}</h3>
               <p>
                 {file
                   ? formatSize(file.size)
-                  : 'Choose an audio recording to get started.'}
+                  : 'Choose a text file to get started.'}
               </p>
               <label className="button secondary file-button">
                 {file ? 'Change file' : 'Choose file'}
                 <input
                   type="file"
-                  accept=".mp3,.wav,.txt,audio/mpeg,audio/wav,audio/x-wav,text/plain"
-                  aria-label="Choose audio file"
+                  accept=".txt,text/plain"
+                  aria-label="Choose text file"
                   aria-describedby="file-guidance file-error"
                   onChange={(event) =>
                     validate(event.target.files?.[0] ?? null)
@@ -85,7 +78,7 @@ export function UploadPage({ onBegin }: { onBegin: (run: Run) => void }) {
                 />
               </label>
               <small id="file-guidance">
-                MP3 or WAV · Up to 1 GB
+                TXT · Up to 1 MB
               </small>
             </div>
             <p id="file-error" className="field-error" role="alert">
@@ -139,10 +132,10 @@ export function UploadPage({ onBegin }: { onBegin: (run: Run) => void }) {
             </div>
           </section>
           <div className="submit-row">
-            <p>Preview only. No file bytes are uploaded or saved.</p>
+            <p>Files are saved and transcribed locally. Refresh History to see progress and results.</p>
             <div className="submit-action">
               <span className="step-number">3</span>
-              <button className="button primary" type="submit">
+              <button className="button primary" type="submit" disabled={busy}>
                 <Icon name="upload" size={17} />
                 Begin upload
               </button>
@@ -153,8 +146,8 @@ export function UploadPage({ onBegin }: { onBegin: (run: Run) => void }) {
           <h2>Instructions</h2>
           <ol>
             <li>
-              <strong>Choose your audio</strong>
-              <span>Select a recording from your device.</span>
+              <strong>Choose your text file</strong>
+              <span>Select a text file from your device.</span>
             </li>
             <li>
               <strong>Transcription settings</strong>

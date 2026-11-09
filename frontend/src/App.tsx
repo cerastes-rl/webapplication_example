@@ -1,5 +1,5 @@
 import { version as APP_VERSION } from '../package.json'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { getCurrentUser, signIn, signOut as endSession } from './api/auth'
 import type { User } from './api/auth'
@@ -8,8 +8,9 @@ import { EmptyState } from './components/EmptyState'
 import { Icon } from './components/Icon'
 import { RunDetail } from './components/RunDetail'
 import { UploadPage } from './components/UploadPage'
-import { advanceRuns, initialRuns } from './preview'
-import type { Run } from './run'
+import { authorizeUpload, cancelUpload, completeUpload, failUpload, getTranscript, listRecordings, putFile } from './api/recordings'
+import type { UploadSettings } from './api/recordings'
+import type { Run, UploadProgress } from './run'
 import { initialHistoryView } from './history'
 import { HistoryPage } from './components/HistoryPage'
 import { SignInForm } from './components/SignInForm'
@@ -40,11 +41,44 @@ function App() {
   const [authError, setAuthError] = useState('')
   const [accessKey, setAccessKey] = useState('')
   const signedIn = user !== null
+  const [page, setPage] = useState<Page>('upload')
+  const [historyView, setHistoryView] = useState(initialHistoryView)
+  const [runs, setRuns] = useState<Run[]>([])
+  const [selected, setSelected] = useState<number | null>(null)
+  const [notice, setNotice] = useState('')
+  const main = useRef<HTMLElement>(null)
+  const session = useRef(0)
+  const historyRequest = useRef<AbortController | null>(null)
+  const [upload, setUpload] = useState<(UploadProgress & { controller: AbortController }) | null>(null)
+  const [dataLoading, setDataLoading] = useState(true)
+  const [dataError, setDataError] = useState('')
+
+  const loadHistory = useCallback(async () => {
+    historyRequest.current?.abort()
+    const controller = new AbortController()
+    historyRequest.current = controller
+    const generation = session.current
+    try {
+      const records = await listRecordings(controller.signal)
+      if (!controller.signal.aborted && generation === session.current)
+        setRuns((current) => records.map((record) => ({
+          ...record, transcript: current.find((run) => run.run_id === record.run_id)?.transcript
+        })))
+    } catch (error) {
+      if (!controller.signal.aborted && generation === session.current)
+        setDataError(error instanceof Error ? error.message : 'Could not load History.')
+    } finally {
+      if (!controller.signal.aborted && generation === session.current) setDataLoading(false)
+    }
+  }, [])
   useEffect(() => {
     const controller = new AbortController()
     getCurrentUser(controller.signal)
       .then((current) => {
-        if (!controller.signal.aborted) setUser(current)
+        if (!controller.signal.aborted) {
+          setUser(current)
+          if (current) void loadHistory()
+        }
       })
       .catch((error) => {
         if (!controller.signal.aborted)
@@ -57,43 +91,54 @@ function App() {
       .finally(() => {
         if (!controller.signal.aborted) setAuthLoading(false)
       })
+    return () => { controller.abort(); historyRequest.current?.abort() }
+  }, [loadHistory])
+  const selectedRun = runs.find((run) => run.run_id === selected)
+  useEffect(() => {
+    if (!user || page !== 'detail' || selectedRun?.transcription_stage !== 'completed' || selectedRun.transcript !== undefined) return
+    const controller = new AbortController()
+    getTranscript(selectedRun.run_id, controller.signal).then((transcript) => {
+      if (!controller.signal.aborted)
+        setRuns((current) => current.map((run) => run.run_id === selectedRun.run_id ? { ...run, transcript } : run))
+    }).catch((error) => {
+      if (!controller.signal.aborted) setDataError(error.message)
+    })
     return () => controller.abort()
-  }, [])
-  const [page, setPage] = useState<Page>('upload')
-  const [historyView, setHistoryView] = useState(initialHistoryView)
-  const [runs, setRuns] = useState<Run[]>(initialRuns)
-  const [selected, setSelected] = useState<string | null>(null)
-  const [notice, setNotice] = useState('')
-  const main = useRef<HTMLElement>(null)
-  const hasActive = runs.some((run) =>
-    ['uploading', 'finalizing', 'queued', 'processing'].includes(run.status)
-  )
+  }, [user, page, selectedRun])
+  const transferController = upload?.controller
+  useEffect(() => () => transferController?.abort(), [transferController])
+  useEffect(() => () => { session.current += 1 }, [])
+  useEffect(() => { main.current?.focus() }, [page, signedIn, authLoading])
+  const uploadInProgress = upload !== null
   useEffect(() => {
-    if (!signedIn || authBusy || !hasActive) return
-    const timer = window.setInterval(() => setRuns(advanceRuns), 1300)
-    return () => window.clearInterval(timer)
-  }, [signedIn, authBusy, hasActive])
-  useEffect(() => {
-    main.current?.focus()
-  }, [page, signedIn, authLoading])
-  const uploading = runs.some(
-    (run) => run.status === 'uploading' || run.status === 'finalizing'
-  )
-  useEffect(() => {
-    if (!uploading) return
+    if (!uploadInProgress) return
     function warn(event: BeforeUnloadEvent) {
       event.preventDefault()
       event.returnValue = ''
     }
     window.addEventListener('beforeunload', warn)
     return () => window.removeEventListener('beforeunload', warn)
-  }, [uploading])
+  }, [uploadInProgress])
+
+  function refreshHistory() {
+    setDataLoading(true)
+    setDataError('')
+    void loadHistory()
+  }
   function navigate(next: Page) {
     setPage(next)
     setNotice('')
+    setDataError('')
+    if (next === 'history') refreshHistory()
   }
   function resetWorkspace() {
-    setRuns(initialRuns)
+    session.current += 1
+    historyRequest.current?.abort()
+    upload?.controller.abort()
+    setUpload(null)
+    setRuns([])
+    setDataLoading(true)
+    setDataError('')
     setHistoryView(initialHistoryView)
     setSelected(null)
     setPage('upload')
@@ -110,72 +155,91 @@ function App() {
       const current = await signIn(accessKey)
       resetWorkspace()
       setUser(current)
+      refreshHistory()
     } catch (error) {
-      setAuthError(
-        error instanceof Error ? error.message : 'Could not sign in. Try again.'
-      )
+      setAuthError(error instanceof Error ? error.message : 'Could not sign in.')
     } finally {
       setAuthBusy(false)
+    }
+  }
+  function saveRun(run: Run) {
+    setRuns((current) => [run, ...current.filter((item) => item.run_id !== run.run_id)])
+  }
+  async function beginUpload(file: File, settings: UploadSettings) {
+    if (upload || !user || authBusy) return
+    const controller = new AbortController()
+    const signal = controller.signal
+    const generation = session.current
+    let id: number | null = null
+    let sent = false
+    setUpload({ controller, run_id: null, progress: 0 })
+    setNotice('Creating your upload record…')
+    try {
+      const authorization = await authorizeUpload(file, settings, signal)
+      if (signal.aborted || generation !== session.current) return
+      id = authorization.run.run_id
+      setUpload({ controller, run_id: id, progress: 0 })
+      saveRun(authorization.run)
+      setPage('history')
+      refreshHistory()
+      setNotice('Uploading to local storage…')
+      await putFile(file, authorization.upload_url, authorization.headers, signal, (progress) => {
+        if (!signal.aborted && generation === session.current)
+          setUpload({ controller, run_id: id, progress })
+      })
+      sent = true
+      saveRun(await completeUpload(id, signal))
+      setNotice('File saved. Transcription has not started.')
+    } catch (error) {
+      if (signal.aborted || generation !== session.current) return
+      if (id !== null && !sent) {
+        try {
+          const failed = await failUpload(id)
+          if (!signal.aborted && generation === session.current) saveRun(failed)
+        } catch { /* The original row stays in History. */ }
+      }
+      if (!signal.aborted && generation === session.current)
+        setNotice(`${error instanceof Error ? error.message : 'Upload failed.'} Select the file again to start a new upload.`)
+    } finally {
+      if (generation === session.current) {
+        setUpload((current) => current?.controller === controller ? null : current)
+        refreshHistory()
+      }
+    }
+  }
+  async function cancel(id: number) {
+    if (!window.confirm('Cancel this upload? Select the file again to start a new run.')) return
+    const generation = session.current
+    if (upload?.run_id === id) upload.controller.abort()
+    try {
+      const run = await cancelUpload(id)
+      if (generation === session.current) {
+        saveRun(run)
+        setNotice('Upload cancelled.')
+      }
+    } catch (error) {
+      if (generation === session.current) setNotice(error instanceof Error ? error.message : 'Cancellation could not be confirmed.')
+    } finally {
+      if (generation === session.current) refreshHistory()
     }
   }
   async function signOut() {
     if (authBusy) return
-    if (
-      uploading &&
-      !window.confirm(
-        'Stop your simulated upload and sign out? No file has been saved.'
-      )
-    )
-      return
-    setRuns((current) =>
-      current.map((run) =>
-        ['uploading', 'finalizing'].includes(run.status)
-          ? { ...run, status: 'cancelled' }
-          : run
-      )
-    )
+    if (upload && !window.confirm('Stop the active upload and sign out?')) return
     setAuthBusy(true)
+    upload?.controller.abort()
     try {
+      if (upload?.run_id !== null && upload?.run_id !== undefined) await cancelUpload(upload.run_id)
       await endSession()
       setUser(null)
       resetWorkspace()
     } catch (error) {
-      setNotice(
-        error instanceof Error
-          ? error.message
-          : 'Could not sign out. Try again.'
-      )
+      setNotice(error instanceof Error ? error.message : 'Could not sign out.')
+      refreshHistory()
     } finally {
       setAuthBusy(false)
     }
   }
-  function retry(id: string) {
-    setRuns((current) =>
-      current.map((run) =>
-        run.id === id && run.status === 'failed'
-          ? {
-              ...run,
-              status: 'queued',
-              error: undefined,
-              attempts: run.attempts + 1
-            }
-          : run
-      )
-    )
-    setNotice('Processing retry queued. This is a simulation.')
-  }
-  function cancel(id: string) {
-    const run = runs.find((item) => item.id === id)
-    if (!run || run.status !== 'uploading') return
-    if (!window.confirm(`Cancel the upload of "${run.filename}"? You will need to select the file again to restart.`)) return
-    setRuns((current) =>
-      current.map((run) =>
-        run.id === id && run.status === 'uploading' ? { ...run, status: 'cancelled' } : run
-      )
-    )
-    setNotice('Preview upload cancelled. No file bytes were transferred.')
-  }
-  const selectedRun = runs.find((run) => run.id === selected)
   return (
     <>
       <a className="skip-link" href="#main">
@@ -254,7 +318,7 @@ function App() {
             </nav>
             <div className="sidebar-bottom">
               <span className="local-dot" /> Built for local exploration
-              <p>Your files stay on your device in this UI preview.</p>
+              <p>Files and run history are saved by the local services.</p>
               <span className="version">SSScribe / {APP_VERSION}</span>
             </div>
           </aside>
@@ -262,23 +326,19 @@ function App() {
             <div className="notification" role="status">
               {notice}
             </div>
+            {dataError && <div role="alert">{dataError} <button className="button secondary" onClick={refreshHistory}>Refresh</button></div>}
+            {dataLoading && <p role="status">Loading saved recordings…</p>}
             {page === 'upload' ? (
-              <UploadPage
-                onBegin={(run) => {
-                  setRuns((current) => [run, ...current])
-                  setPage('history')
-                  setNotice(
-                    'Preview started. Progress is simulated; no file bytes are uploaded or saved.'
-                  )
-                }}
-              />
+              <UploadPage onBegin={beginUpload} busy={upload !== null || authBusy} />
             ) : page === 'detail' ? (
-              selectedRun ? (
+              selectedRun?.transcription_stage === 'completed' && selectedRun.transcript === undefined ? (
+                <p role="status">Loading stored transcript…</p>
+              ) : selectedRun ? (
                 <RunDetail
                   run={selectedRun}
                   onBack={() => navigate('history')}
-                  onRetry={() => retry(selectedRun.id)}
-                  onCancel={() => cancel(selectedRun.id)}
+                  progress={upload?.run_id === selectedRun.run_id ? upload.progress : undefined}
+                  onCancel={() => cancel(selectedRun.run_id)}
                 />
               ) : (
                 <EmptyState
@@ -292,7 +352,7 @@ function App() {
                     </button>
                   }
                 >
-                  This recording is not available in the current preview.
+                  This recording is not available for the current user.
                 </EmptyState>
               )
             ) : (
@@ -301,11 +361,12 @@ function App() {
                 view={historyView}
                 onViewChange={setHistoryView}
                 onUpload={() => navigate('upload')}
+                onRefresh={refreshHistory}
                 onOpen={(id) => {
                   setSelected(id)
                   navigate('detail')
                 }}
-                onRetry={retry}
+                upload={upload}
                 onCancel={cancel}
               />
             )}

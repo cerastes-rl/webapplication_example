@@ -15,13 +15,21 @@ from urllib.request import HTTPCookieProcessor, Request, build_opener
 
 
 class ApiTestCase(unittest.TestCase):
+    processing_enabled = False
+
     @classmethod
     def start_server(cls):
+        # Upload/read contract tests control their own states; processing has separate coverage.
+        script = 'import uvicorn; from src import processing; '
+        if not cls.processing_enabled:
+            script += 'processing.process_cycle = lambda *args: None; '
+        else:
+            script += 'processing.INTERVAL_SECONDS = .05; '
+        script += f"uvicorn.run('main:app', host='127.0.0.1', port={cls.port}, log_level='warning')"
         cls.server = subprocess.Popen(
-            [sys.executable, "-m", "uvicorn", "main:app", "--host", "127.0.0.1",
-             "--port", str(cls.port), "--log-level", "warning"],
+            [sys.executable, '-c', script],
             cwd=Path(__file__).resolve().parents[1], stdout=cls.logs, stderr=cls.logs,
-            env={**os.environ, "SSSCRIBE_DATABASE_PATH": str(cls.database_path)},
+            env={**os.environ, **getattr(cls, "api_env", {}), "SSSCRIBE_DATABASE_PATH": str(cls.database_path)},
         )
         for _ in range(100):
             try:
@@ -42,6 +50,11 @@ class ApiTestCase(unittest.TestCase):
             cls.port = listener.getsockname()[1]
         cls.base = f"http://127.0.0.1:{cls.port}"
         cls.logs = tempfile.TemporaryFile()
+        subprocess.run(
+            [sys.executable, 'src/database.py'], cwd=Path(__file__).resolve().parents[1],
+            env={**os.environ, 'SSSCRIBE_DATABASE_PATH': str(cls.database_path)},
+            check=True, capture_output=True,
+        )
         cls.start_server()
 
     @classmethod
@@ -72,6 +85,27 @@ class ApiTestCase(unittest.TestCase):
 
 
 class AuthTests(ApiTestCase):
+    def test_api_startup_does_not_initialize_database(self):
+        original = self.database_path
+        self.server.terminate()
+        self.server.wait(timeout=5)
+        type(self).database_path = Path(self.data_dir.name) / 'not-initialized.db'
+        try:
+            type(self).start_server()
+            self.assertFalse(self.database_path.exists())
+            client, _ = self.client()
+            self.call(client, '/api/auth/sign-in', {'access_key': 'austin'})
+            with self.assertRaises(HTTPError) as error:
+                client.open(self.base + '/api/runs', timeout=2)
+            self.assertEqual(error.exception.code, 500)
+            error.exception.close()
+            self.assertFalse(self.database_path.exists())
+        finally:
+            self.server.terminate()
+            self.server.wait(timeout=5)
+            type(self).database_path = original
+            type(self).start_server()
+
     def test_health_and_signed_out_user(self):
         client, _ = self.client()
         self.assertEqual(self.call(client, "/api/health")[:2], (200, {"status": "OK!"}))

@@ -1,25 +1,35 @@
+import asyncio
+import threading
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from starlette.concurrency import run_in_threadpool
 
-from src import database
+from src import database, processing
 from api.auth import router as auth_router
 from api.runs import router as runs_router
+from api.uploads import router as uploads_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.database_path = database.configured_database_path()
-    await run_in_threadpool(database.initialize_database, app.state.database_path)
-    yield
+    stop = threading.Event()
+    wake = asyncio.Event()
+    worker = asyncio.create_task(processing.run_worker(app.state.database_path, stop, wake))
+    try:
+        yield
+    finally:
+        stop.set()
+        wake.set()
+        await worker
 
 
 app = FastAPI(lifespan=lifespan)
+app.state.database_path = database.configured_database_path()
 app.include_router(auth_router)
 app.include_router(runs_router)
+app.include_router(uploads_router)
 
 
 @app.exception_handler(HTTPException)

@@ -17,15 +17,16 @@ class RunTests(ApiTestCase):
                 (2, "john", "completed", "John's private transcript"),
                 (3, "austin", "uploading", None),
                 (4, "austin", "completed", None),
-                (5, "austin", "processing", "Unfinished text"),
+                (5, "austin", "running", "Unfinished text"),
             ]:
                 connection.execute(
                     """INSERT INTO runs (
-                        run_id, owner_id, filename, storage_key, status, transcript_text,
+                        run_id, owner_id, filename, storage_key, upload_stage, transcription_stage, transcript_text,
                         speech_job_id, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (run_id, owner, f"sample-{run_id}.wav", "private/object-key", status,
-                     transcript, "private-speech-id", "2026-11-09T12:00:00.000Z",
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (run_id, owner, f"sample-{run_id}.wav", "private/object-key",
+                     "uploading" if status == "uploading" else "completed",
+                     "not_started" if status == "uploading" else status, transcript, "private-speech-id", "2026-11-09T12:00:00.000Z",
                      "2026-11-09T12:00:00.000Z"),
                 )
 
@@ -34,6 +35,14 @@ class RunTests(ApiTestCase):
         self.assertEqual(self.call(client, "/api/auth/sign-in", {"access_key": key})[0], 200)
         return client
 
+    def test_transcription_stage_constraint(self):
+        with closing(sqlite3.connect(self.database_path)) as connection, connection:
+            for stage in ['not_started', 'queued', 'running', 'importing', 'completed', 'failed', 'submission_uncertain']:
+                connection.execute("UPDATE runs SET transcription_stage = ? WHERE run_id = 1", (stage,))
+            for stage in ['submitting', 'processing', 'succeeded', 'Succeeded']:
+                with self.assertRaises(sqlite3.IntegrityError):
+                    connection.execute("UPDATE runs SET transcription_stage = ? WHERE run_id = 1", (stage,))
+
     def test_all_reads_require_authentication(self):
         for route in ["/api/runs", "/api/runs/1/transcript"]:
             status, body, headers = self.call(build_opener(), route)
@@ -41,15 +50,18 @@ class RunTests(ApiTestCase):
             self.assertEqual(body["error"]["code"], "unauthorized")
             self.assertEqual(headers["Cache-Control"], "no-store")
 
-    def test_list_is_owner_scoped_bounded_and_stably_ordered(self):
+    def test_list_returns_all_owned_rows_in_stable_order(self):
         austin = self.signed_in()
         status, runs, headers = self.call(austin, "/api/runs")
         self.assertEqual(status, 200)
         self.assertEqual([run["run_id"] for run in runs], [5, 4, 3, 1])
         self.assertEqual(headers["Cache-Control"], "no-store")
-        page = self.call(austin, "/api/runs?limit=2&offset=1")[1]
-        self.assertEqual([run["run_id"] for run in page], [4, 3])
-        self.assertEqual(self.call(austin, "/api/runs?offset=100")[1], [])
+        with closing(sqlite3.connect(self.database_path)) as connection, connection:
+            connection.executemany(
+                "INSERT INTO runs(owner_id, filename, storage_key) VALUES ('austin', ?, ?)",
+                [(f'file-{i}.txt', f'key-{i}') for i in range(100)],
+            )
+        self.assertEqual(len(self.call(austin, '/api/runs')[1]), 104)
         john = self.signed_in("john")
         self.assertEqual([run["run_id"] for run in self.call(john, "/api/runs")[1]], [2])
         with closing(sqlite3.connect(self.database_path)) as connection, connection:
@@ -63,7 +75,7 @@ class RunTests(ApiTestCase):
         run = next(run for run in runs if run["run_id"] == 1)
         self.assertEqual(set(run), {
             "run_id", "filename", "size_bytes", "language", "requested_speakers",
-            "include_speaker_labels", "include_timestamps", "status", "error_message",
+            "include_speaker_labels", "include_timestamps", "upload_stage", "transcription_stage", "error_message",
             "created_at", "updated_at",
         })
         self.assertIsNone(run["size_bytes"])
@@ -99,10 +111,9 @@ class RunTests(ApiTestCase):
     def test_invalid_parameters_have_predictable_errors(self):
         client = self.signed_in()
         for route in [
-            "/api/runs?limit=0", "/api/runs?limit=101", "/api/runs?offset=-1",
-            "/api/runs?limit=oops", "/api/runs/0/transcript", "/api/runs/-1/transcript",
+            "/api/runs/0/transcript", "/api/runs/-1/transcript",
             "/api/runs/not-an-id/transcript", "/api/runs/9223372036854775808/transcript",
-            "/api/runs?offset=9223372036854775808", "/api/runs/1%20OR%201=1/transcript",
+            "/api/runs/1%20OR%201=1/transcript",
         ]:
             status, body, headers = self.call(client, route)
             self.assertEqual(status, 422, route)

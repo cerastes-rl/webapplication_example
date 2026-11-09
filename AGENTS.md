@@ -6,6 +6,8 @@ Build a working local mock of an authenticated speech-to-text application. Prior
 
 ## Repository conventions
 
+- Implement the bare minimum requested. Do not add speculative safeguards, fields, adapters or infrastructure. Prefer direct functions and explain a necessary scope change before making it.
+
 - `frontend/`: React + TypeScript + Vite, **pnpm**, existing **Oxlint** configuration and plain CSS.
 - `backend/`: Python + FastAPI + Uvicorn, existing virtual environment and `requirements.txt` workflow.
 - Preserve Vite's `/api` proxy to port 8000 and dev-container ports 5173/8000.
@@ -15,79 +17,20 @@ Build a working local mock of an authenticated speech-to-text application. Prior
 
 ## Current milestone
 
-The UI preview is implemented for review. It restores an Austin/John backend session or opens the access-key sign-in form, with navy accents, light/dark themes, a persistent banner, Upload/History navigation, simulated runs and sample transcript details.
+The local upload slice is connected through queued state. UI/auth review was approved on 2026-11-09; connected browser/accessibility and responsive review remain pending.
 
-- `frontend/src/preview.ts`: temporary fixtures, sample transcript creation and simulated transitions. `src/run.ts` owns the run contract and display helpers; `src/history.ts` owns History preferences. Transcript details render `run.transcript` verbatim for display, Copy and Download.
-- `App.tsx`: shell, navigation, theme, backend session/sign-in, preview state and timer. `components/SignInForm.tsx` renders sign-in; `components/HistoryPage.tsx` renders History. `src/api/auth.ts` owns typed auth calls.
-- `frontend/src/components/`: one file per UI component, including shared visuals, Upload and run details. Keep static images in `src/assets/`, request clients in `src/api/` and app coordination in `App.tsx`. Keep folders shallow and use idiomatic React/TypeScript. Keep teaching explanations in conversation; questions about traces do not by themselves authorize refactors. See `frontend/README.md#source-layout`.
-- Reload resets preview runs, form and navigation, then restores identity through `/api/auth/me`. Sign-out and each new sign-in reset preview runs. Theme persists under `ssscribe-theme` when localStorage is available.
-- Simulation continues across internal navigation and pauses while signed out or an auth request is pending. History remains shared sample data; SQL user filtering is deferred.
-- The picker accepts non-empty MP3/WAV up to **4,000,000,000 bytes inclusive**, checking extension and size. Requested speakers are Automatic or 1–10, language English, speaker labels/timestamps default on.
-- Main FastAPI exposes health plus `/api/auth/sign-in`, `/api/auth/me` and `/api/auth/sign-out`. Access keys and stable IDs are exactly `austin` and `john`; sessions are in memory with an HttpOnly cookie. Restart requires sign-in. `backend/api/auth.py` exposes `get_current_user` for future SQL ownership checks.
-
-**Current UI is complete for this scope; the user explicitly approved it on 2026-11-09. Local Austin/John auth and its interaction review are also complete. Responsive layout review is deferred; browser/accessibility checks and focused interaction tests remain follow-up validation. The UI approval gate is satisfied; connected History/upload integration remains planned and requires its own implementation request.**
+- `App.tsx` owns navigation, session state, API-backed History and one active-upload object. `run.ts` uses the API's fields and numeric run IDs directly; `history.ts` owns frontend search/sort/page preferences. Components stay one file per component; clients stay under `src/api/`.
+- Connected uploads accept non-empty TXT up to **1,000,000 bytes inclusive**, English, Automatic/1–10 speakers, labels/timestamps default on. Begin upload creates a row, PUTs bytes directly to storage and POSTs completion; the API HEAD-verifies bytes before queuing.
+- `GET /api/runs` returns all owned rows; frontend controls pagination. Load History after sign-in/session restoration, on entering History, after mutations and on Refresh. Opening Upload/details should not reload the whole list.
+- Failed/interrupted uploads require reselection and a new submission. Cancellation aborts the local transfer and conditionally persists cancellation before DELETE. No preview fixtures, Check upload controls, fake attempt counters, request IDs, deduplication indexes or automatic creation retries.
+- The single runs table stores `upload_stage` and `transcription_stage`. Initialize it explicitly through `backend/src/database.py` or the retained VS Code task. FastAPI must not initialize or upgrade it; no automatic legacy-schema conversion.
+- Root `services/` holds independent storage (8001) and Speech (8002) mocks sharing `backend/.venv`. Storage supports only PUT/HEAD/DELETE. Retain Speech's timed processing and 30-minute terminal-job expiry; files persist. Data remains under ignored `backend/data/`.
+- Austin/John keys and stable IDs are exactly `austin` and `john`. HttpOnly-cookie sessions live in memory; API restart requires sign-in without deleting records. Theme persists under `ssscribe-theme` where available. Stale responses must not restore signed-out data.
+- Use `.vscode/tasks.json` for automatic startup; no duplicate startup shell helper. Declare only direct Python dependencies in `requirements.txt`.
 
 ## Planned connected architecture
 
-FastAPI owns routes, fixed-user mock auth and lifespan-managed background loops. SQL stores workflow state; loops query due rows to execute submit/poll/import/recovery logic. Start with one backend process, one Uvicorn worker and one instance. Add SQL-backed leases before scale-out and enable App Service Always On on a supported plan.
-
-| Responsibility | Local connected implementation | Production service |
-|---|---|---|
-| Frontend | React/Vite | Azure Static Web Apps |
-| API and background loops | FastAPI/Uvicorn | Azure App Service |
-| Authentication | Fixed-user adapter inside FastAPI | Microsoft Entra ID |
-| Runs, files, jobs, transcripts | SQLite through SQLAlchemy | Azure SQL Database |
-| Audio | Separate HTTP storage mock backed by files | Private Azure Blob Storage |
-| Batch transcription | Separate HTTP Speech API mock | Azure AI Speech |
-
-Keep HTTP clients/adapters narrow and service contracts realistic. The Speech mock owns simulated batch jobs/results and reads/checks source audio through the storage boundary. FastAPI owns application SQL and imports readable text.
-
-### Upload and persistence
-
-- Create persistent run/options before transfer so History includes active, interrupted, failed and cancelled submissions.
-- Authorize a direct single-request browser upload to the storage mock. Stream to safe generated temporary paths with bounded memory, enforce actual-byte limits and finalize stored objects before marking a SQL job ready.
-- The shell owns upload requests across internal navigation and reports measured bytes/progress. Interruption requires restart/reselection. Reconcile lost completion responses before resending bytes.
-- Persist cancellation/failure stages, clean partials/abandoned objects and recover stale uploads using evidence of inactivity while preserving healthy slow transfers.
-- Store provider/object keys and Speech IDs privately in SQL. Public DTOs expose run/file IDs, metadata, settings and application state.
-- Store readable transcripts as SQLite `TEXT`, later Azure SQL `NVARCHAR(MAX)`, and commit transcript/completion atomically.
-- Resolve connected size/duration/options policy before uploads: Speech batch documents a **1 GB input limit** and **240 minutes with diarization**, while the preview accepts 4 GB. Preserve the preview policy until a product decision is recorded.
-
-### Background execution
-
-Use FastAPI lifespan to start/supervise loops and cancel/await them on shutdown. SQL persists claims/submission-start, attempts, Speech IDs, due times, errors and unfinished imports. Use asynchronous HTTP, non-blocking waits and short task-scoped SQL sessions. Commit transactions before network calls.
-
-Resume saved Speech IDs and imports after restart. Reconcile uncertain submissions after lost responses/crashes. Conditional claims, concurrent-retry guards and idempotent imports protect work. UI polling reads persisted application state on a separate schedule from Speech polling.
-
-### API direction
-
-Use a small typed frontend API client and Pydantic request/response models with stable IDs, UTC timestamps, predictable errors and ownership checks. Connected API errors render actionable error states. Keep preview fixtures in the explicit UI-review boundary.
-
-| Method | Route | Purpose |
-|---|---|---|
-| `GET` | `/api/health` | Health |
-| `GET` | `/api/files` | Run/file metadata and states |
-| `GET` | `/api/files/{file_id}` | Details |
-| `GET` | `/api/files/{file_id}/transcript` | Stored readable transcript |
-| `POST` | `/api/uploads/authorize` | Create run/options and authorize storage transfer |
-| `POST` | `/api/uploads/complete` | Verify stored bytes and mark SQL job ready |
-| `POST` | `/api/files/{file_id}/retry` | Mark eligible failed processing ready |
-
-Finalize auth, cancellation/restart routes and run-aware DTOs before implementing their slices. See [requirements](docs/REQUIREMENTS.md) and [call sequences](docs/API_DATA_FLOW.md).
-
-### Data model
-
-- `runs`: stable ID, file relationship, options, submitted time, upload/run state and failure stage.
-- `files`: ID, filename, type, actual size, storage provider/object key, uploader and creation time.
-- `jobs`: run/file relationships, processing state, claims/submission-start, attempts, Speech ID, next-action times, errors and import state.
-- `transcripts`: run/file/job relationships, readable text and creation time.
-
-Processing retry retains run/file/options; reprocessing with changed settings creates a new run. Seed deterministic examples idempotently and label them. Add DB/upload/partial/sidecar exclusions before generating proposed `backend/data/app.db` and `backend/data/uploads/` stores. Keep migration complexity proportional to the prototype.
-
-## UI and validation
-
-Use accessible controls, navy accents, light/dark theme tokens and responsive layouts. Keep typed data/transitions separate from rendering. Poll conservatively while active jobs exist and stop on sign-out or when work is terminal. Add focused tests for auth/contracts, streamed bytes, transitions, retry/cancel, restart recovery and core UI interactions as those features are delivered.
-
-The connected acceptance journey covers sign-in, History, actual upload, queued/processing/completed states, stored transcript, failed-job retry, cancellation and persistence across reload/restart. Keep startup, mock behavior and recovery instructions current.
+The single [implementation plan](docs/IMPLEMENTATION_PLAN.md) separates current behavior from the next Speech integration slice and production direction. Add processing functions only when requested. Preserve service boundaries and use short SQL operations separate from HTTP calls. The simple storage interface cannot fence a late PUT; automatic orphan cleanup remains deferred.
 
 ## Sequence diagrams and explanations
 

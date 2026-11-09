@@ -3,8 +3,8 @@ import { SortableHeader } from './SortableHeader'
 import { EmptyState } from './EmptyState'
 import { Icon } from './Icon'
 import { StatusBadge } from './StatusBadge'
-import { formatDate, formatSize, getRunStatuses } from '../run'
-import type { Run } from '../run'
+import { formatDate, formatSize } from '../run'
+import type { Run, UploadProgress } from '../run'
 import type { HistoryViewState } from '../history'
 
 type HistoryPageProps = {
@@ -12,9 +12,10 @@ type HistoryPageProps = {
   view: HistoryViewState
   onViewChange: (view: HistoryViewState) => void
   onUpload: () => void
-  onOpen: (id: string) => void
-  onRetry: (id: string) => void
-  onCancel: (id: string) => void
+  onOpen: (id: number) => void
+  upload: UploadProgress | null
+  onRefresh: () => void
+  onCancel: (id: number) => void
 }
 
 export function HistoryPage({
@@ -23,7 +24,8 @@ export function HistoryPage({
   onViewChange,
   onUpload,
   onOpen,
-  onRetry,
+  upload,
+  onRefresh,
   onCancel
 }: HistoryPageProps) {
   const searchInput = useRef<HTMLInputElement>(null)
@@ -44,17 +46,17 @@ export function HistoryPage({
   const matchingRuns = runs.filter((run) => run.filename.toLowerCase().includes(query))
   const sortedRuns = [...matchingRuns].sort((a, b) => {
     const difference = sort.column === 'created'
-      ? Date.parse(a.created) - Date.parse(b.created)
-      : a.size - b.size
+      ? Date.parse(a.created_at) - Date.parse(b.created_at)
+      : (a.size_bytes ?? 0) - (b.size_bytes ?? 0)
     return (sort.direction === 'ascending' ? difference : -difference)
-      || a.id.localeCompare(b.id)
+      || a.run_id - b.run_id
   })
   const pageCount = Math.max(1, Math.ceil(matchingRuns.length / pageSize))
   const currentPage = Math.min(page, pageCount)
   const start = (currentPage - 1) * pageSize
   const visibleRuns = sortedRuns.slice(start, start + pageSize)
-  const completed = runs.filter((run) => run.status === 'completed').length
-  const inProgress = runs.filter((run) => ['uploading', 'finalizing', 'queued', 'processing'].includes(run.status)).length
+  const completed = runs.filter((run) => run.transcription_stage === 'completed').length
+  const inProgress = runs.filter((run) => run.upload_stage === 'uploading' || ['queued', 'running', 'importing'].includes(run.transcription_stage)).length
 
   return (
     <>
@@ -63,6 +65,7 @@ export function HistoryPage({
           <h1>Recording history</h1>
           <p>Track recording uploads, transcription progress and completed transcripts.</p>
         </div>
+        <button className="button secondary" onClick={onRefresh}>Refresh</button>
         <button className="button primary" onClick={onUpload}>
           <Icon name="upload" size={17} />
           Upload recording
@@ -200,7 +203,7 @@ export function HistoryPage({
               </thead>
               <tbody>
                 {visibleRuns.map((run) => (
-                  <tr key={run.id}>
+                  <tr key={run.run_id}>
                     <td>
                       <div className="recording-cell">
                         <span className="file-icon">
@@ -209,64 +212,49 @@ export function HistoryPage({
                         <div>
                           <button
                             className="filename-button"
-                            onClick={() => onOpen(run.id)}
+                            onClick={() => onOpen(run.run_id)}
                           >
                             {run.filename}
                           </button>
-                          <span className="run-id">{run.id}</span>
+                          <span className="run-id">{run.run_id}</span>
                         </div>
                       </div>
                     </td>
-                    <td>{formatDate(run.created)}</td>
-                    <td className="nowrap">{formatSize(run.size)}</td>
-                    <td>{run.speakers ?? 'Auto'}</td>
+                    <td>{formatDate(run.created_at)}</td>
+                    <td className="nowrap">{formatSize(run.size_bytes)}</td>
+                    <td>{run.requested_speakers ?? 'Auto'}</td>
                     <td>
                       <div className="row-settings">
-                        <span>{run.language}</span>
+                        <span>{run.language === 'en-US' ? 'English' : run.language}</span>
                         <small>
-                          {run.labels ? 'Speaker labels' : 'No labels'} ·{' '}
-                          {run.timestamps ? 'Timestamps' : 'No timestamps'}
+                          {run.include_speaker_labels ? 'Speaker labels' : 'No labels'} ·{' '}
+                          {run.include_timestamps ? 'Timestamps' : 'No timestamps'}
                         </small>
                       </div>
                     </td>
                     <td>
-                      <StatusBadge status={getRunStatuses(run).upload} />
-                      {run.status === 'uploading' && (
+                      <StatusBadge status={upload?.run_id === run.run_id && upload.progress === 100 ? 'finalizing' : run.upload_stage} />
+                      {upload?.run_id === run.run_id && (
                         <div className="row-progress">
                           <progress
                             max={100}
-                            value={run.progress}
-                            aria-label={`Simulated upload progress for ${run.filename}`}
+                            value={upload.progress}
+                            aria-label={`Upload progress for ${run.filename}`}
                           />
-                          <small>{run.progress}% · simulated</small>
+                          <small>{upload.progress}%</small>
                         </div>
                       )}
                     </td>
                     <td>
-                      <StatusBadge status={getRunStatuses(run).transcription} />
+                      <StatusBadge status={run.transcription_stage} />
                     </td>
                     <td>
-                      {run.status === 'failed' ? (
-                        <button
-                          className="button secondary history-action"
-                          onClick={() => onRetry(run.id)}
-                        >
-                          Retry
-                        </button>
-                      ) : run.status === 'uploading' ? (
-                        <button
-                          className="button secondary history-action"
-                          onClick={() => onCancel(run.id)}
-                        >
-                          Cancel
-                        </button>
+                      {['uploading', 'failed'].includes(run.upload_stage) ? (
+                        <button className="button secondary history-action" onClick={() => onCancel(run.run_id)}>Cancel</button>
                       ) : (
-                        <button
-                          className="button secondary history-action"
+                        <button className="button secondary history-action"
                           aria-label={`View transcript for ${run.filename}`}
-                          disabled={run.status !== 'completed'}
-                          onClick={() => onOpen(run.id)}
-                        >
+                          disabled={run.transcription_stage !== 'completed'} onClick={() => onOpen(run.run_id)}>
                           View transcript
                         </button>
                       )}

@@ -1,7 +1,6 @@
 """Minimal local subset of Azure Blob Storage: Put Blob, HEAD and Delete Blob."""
 
 import os
-import re
 from contextlib import asynccontextmanager
 from email.utils import formatdate
 from pathlib import Path
@@ -12,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.concurrency import run_in_threadpool
 from starlette.requests import ClientDisconnect
 
-ROOT = Path(os.environ.get('SSSCRIBE_STORAGE_DIR', Path(__file__).resolve().parents[1] / 'backend/data/storage'))
+ROOT = Path(os.environ.get('SSSCRIBE_STORAGE_DIR', Path(__file__).resolve().parents[1] / 'backend/data/blobs/audio'))
 MAX_BYTES = int(os.environ.get('SSSCRIBE_STORAGE_MAX_BYTES', '1000000'))
 
 
@@ -35,7 +34,9 @@ app.add_middleware(
 
 
 def blob_path(name: str) -> Path:
-    if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,254}', name):
+    if (not name or len(name.encode('utf-8')) > 255 or name.startswith('.')
+            or any(char in name for char in ('/', '\\'))
+            or any(ord(char) < 32 or ord(char) == 127 for char in name)):
         raise HTTPException(400, 'InvalidResourceName')
     return ROOT / name
 

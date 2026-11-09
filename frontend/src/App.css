@@ -71,8 +71,8 @@ tbody tr:hover { background: var(--surface-soft); }
 .status-dot { width: 5px; height: 5px; background: currentColor; border-radius: 50%; }
 .status.completed, .status.uploading, .status.finalizing { background: var(--tint); color: var(--accent-ink); }
 .status.failed { background: var(--error-bg); color: var(--error); }
-.status.processing { background: var(--processing-bg); color: var(--processing); }
 .status.queued { background: var(--warning-bg); color: var(--warning); }
+.status.running { background: var(--processing-bg); color: var(--processing); }
 .row-progress { min-width: 110px; margin-top: 8px; }
 .row-progress small { font-size: 9px; }
 .table-pagination { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 12px 20px; color: var(--muted); font-size: 11px; }

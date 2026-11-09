@@ -10,9 +10,11 @@ CREATE TABLE IF NOT EXISTS runs (
         CHECK (include_speaker_labels IN (0, 1)),
     include_timestamps INTEGER NOT NULL DEFAULT 1
         CHECK (include_timestamps IN (0, 1)),
-    status TEXT NOT NULL DEFAULT 'uploading' CHECK (status IN (
-        'uploading', 'queued', 'submitting', 'processing', 'importing',
-        'completed', 'failed', 'cancelled', 'submission_uncertain'
+    upload_stage TEXT NOT NULL DEFAULT 'uploading'
+        CHECK (upload_stage IN ('uploading', 'completed', 'failed', 'cancelled')),
+    transcription_stage TEXT NOT NULL DEFAULT 'not_started' CHECK (transcription_stage IN (
+        'not_started', 'queued', 'running', 'importing',
+        'completed', 'failed', 'submission_uncertain'
     )),
     speech_job_id TEXT,
     speech_status TEXT CHECK (speech_status IN (

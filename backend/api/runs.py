@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Path as PathParameter, Query, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Path as PathParameter, Request, Response
 from pydantic import BaseModel
 
 from src import database
@@ -23,9 +23,10 @@ class RunResponse(BaseModel):
     requested_speakers: int | None
     include_speaker_labels: bool
     include_timestamps: bool
-    status: Literal[
-        "uploading", "queued", "submitting", "processing", "importing",
-        "completed", "failed", "cancelled", "submission_uncertain",
+    upload_stage: Literal["uploading", "completed", "failed", "cancelled"]
+    transcription_stage: Literal[
+        "not_started", "queued", "running", "importing",
+        "completed", "failed", "submission_uncertain",
     ]
     error_message: str | None
     created_at: datetime
@@ -47,11 +48,9 @@ DatabasePath = Annotated[Path, Depends(database_path)]
 @router.get("", response_model=list[RunResponse])
 def list_runs(
     user: CurrentUser, path: DatabasePath, response: Response,
-    limit: Annotated[int, Query(ge=1, le=100)] = 50,
-    offset: Annotated[int, Query(ge=0, le=9_223_372_036_854_775_807)] = 0,
 ):
     response.headers["Cache-Control"] = "no-store"
-    return database.list_runs(path, user.id, limit, offset)
+    return database.list_runs(path, user.id)
 
 
 @router.get("/{run_id}/transcript", response_model=TranscriptResponse)
@@ -59,7 +58,7 @@ def get_transcript(run_id: RunId, user: CurrentUser, path: DatabasePath, respons
     run = database.get_transcript(path, user.id, run_id)
     if run is None:
         raise HTTPException(404, "Run not found.")
-    if run["status"] != "completed" or run["transcript_text"] is None:
+    if run["transcription_stage"] != "completed" or run["transcript_text"] is None:
         raise HTTPException(409, "Transcript is not available yet.")
     response.headers["Cache-Control"] = "no-store"
     return {"run_id": run_id, "transcript_text": run["transcript_text"]}
