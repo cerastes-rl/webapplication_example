@@ -77,9 +77,9 @@ Run backend auth and SQLite API checks from the repository root:
 backend/.venv/bin/python -m unittest discover -s backend/tests -v
 ```
 
-The dev container forwards 5173/8000/8002. On container creation, `postCreateCommand` creates/reuses `backend/.venv` and installs `backend/requirements.txt`. Rebuild the container to apply setup changes. After dependency changes, run `backend/.venv/bin/python -m pip install -r backend/requirements.txt` from the repository root.
+The dev container forwards 5173/8000/8001/8002. On container creation, `postCreateCommand` creates/reuses `backend/.venv` and installs `backend/requirements.txt`. Rebuild the container to apply setup changes. After dependency changes, run `backend/.venv/bin/python -m pip install -r backend/requirements.txt` from the repository root.
 
-`.vscode/tasks.json` defines folder-open startup tasks for Vite, the main FastAPI app, the Speech mock and database initialization. You can also run **Start Speech Mock** from VS Code's Run Task menu. `.devcontainer/start-dev.sh` starts missing services and writes logs under `.devcontainer/logs/`, including `speech-mock.log`. It installs Python requirements when creating a missing venv; update existing environments explicitly. Install frontend dependencies with pnpm.
+`.vscode/tasks.json` defines folder-open startup tasks for Vite, the main FastAPI app, both mocks and database initialization. You can also run **Start Speech Mock** from VS Code's Run Task menu. `.devcontainer/start-dev.sh` starts missing services and writes logs under `.devcontainer/logs/`, including `speech-mock.log` and `storage-mock.log`. It installs Python requirements when creating a missing venv; update existing environments explicitly. Install frontend dependencies with pnpm.
 
 See the [project structure guide](docs/PROJECT_STRUCTURE.md) for the source tree and editing map. Frontend UI components live in `src/components/` and auth requests in `src/api/`. `App.tsx` coordinates shared state and navigation; `run.ts` defines the run contract and display helpers, `history.ts` defines History preferences, and `preview.ts` owns fixtures and simulation.
 
@@ -99,11 +99,33 @@ SQLite initialization and authenticated read API access are implemented using Py
 
 The database starts empty; this step adds no seed data or write routes. Sign in at `http://localhost:8000/docs`, then try the run routes there. `GET /api/runs` returns an empty array until records exist. The UI and Begin upload still use browser-memory preview runs. Upload writes, worker processing and UI persistence remain pending. Tests create isolated temporary databases with fixtures, verify ownership and verbatim transcripts, and restart the API to confirm rows persist while sessions expire. The accepted single-table schema supersedes the earlier multi-table proposal for the current local slice. Re-running initialization creates missing tables; it does not migrate an existing schema.
 
+Both mocks live in root-level `services/` and run as separate processes using `backend/.venv` and the shared `backend/requirements.txt`.
+
+## Run the standalone storage mock
+
+```bash
+# From the repository root
+backend/.venv/bin/python -m uvicorn services.storage_mock:app --host 127.0.0.1 --port 8001 --no-access-log
+```
+
+Open **http://localhost:8001/docs**. Run one worker. The **Start Storage Mock** task and startup helper use this command. Port 8001 is forwarded by the dev container; rebuild it to apply the forwarding change.
+
+The mock implements three operations on `/blobs/{name}`: PUT (201, create/overwrite), HEAD (200, size/properties) and DELETE (202). Missing blobs return 404. Upload raw file bytes with `x-ms-blob-type: BlockBlob` and Content-Length. For example:
+
+```bash
+curl -i -X PUT http://localhost:8001/blobs/example.txt \
+  -H 'x-ms-blob-type: BlockBlob' -H 'Content-Type: text/plain' --data-binary 'hello'
+curl -I http://localhost:8001/blobs/example.txt
+curl -i -X DELETE http://localhost:8001/blobs/example.txt
+```
+
+Bytes persist under ignored `backend/data/storage/`. The local text-fixture limit is **1,000,000 bytes**, configurable with `SSSCRIBE_STORAGE_MAX_BYTES`. This standalone mock has no authentication, SAS generation, GET/download operation or receipt store. See [the storage contract](docs/PROJECT_STRUCTURE.md#standalone-storage-mock) for supported headers/configuration. Main API and UI integration remain planned.
+
 ## Run the standalone Speech mock
 
 ```bash
-cd backend
-.venv/bin/python -m uvicorn services.speech_mock:app --host 127.0.0.1 --port 8002
+# From the repository root
+backend/.venv/bin/python -m uvicorn services.speech_mock:app --host 127.0.0.1 --port 8002
 ```
 
 Open http://localhost:8002/docs. Port 8002 is included in dev-container forwarding; rebuild the container to apply configuration changes. The Speech startup task runs without reload so code edits do not reset in-memory jobs; restart the task to apply Speech code changes. This standalone mock reads/writes local files; it needs no storage service. Paths are relative to `backend/` and must stay under `data/blobs/`. A leading slash is optional and still means a backend-relative mock path.
@@ -152,4 +174,4 @@ Production can later move background execution to [timer/queue-triggered Azure F
 
 **Open decisions:** connected size/duration policy, Speech option mapping, production session/access contracts and cleanup intervals. Local session and upload cancellation contracts are defined in the local implementation plan. The preview limit is **1 GB**; connected validation must also account for Speech batch's **240-minute diarization** limit. See [Speech planning notes and sources](docs/IMPLEMENTATION_PLAN.md#azure-speech-api-interaction).
 
-The local database is `backend/data/databases/app.db`; `backend/data/uploads/` remains a proposed upload store. Local databases, sidecars, audio and partials are ignored by Git. Document service startup, seeds, reset and cleanup commands as those features are delivered.
+The local database is `backend/data/databases/app.db`; the standalone storage mock uses `backend/data/storage/`. Local databases, sidecars, audio and partials are ignored by Git. Document service startup, seeds, reset and cleanup commands as those features are delivered.

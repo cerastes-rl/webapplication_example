@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field, field_validator
 QUEUED_SECONDS = 10
 PROCESSING_SECONDS = 20
 RETENTION_SECONDS = 30 * 60
-BACKEND_DIR = Path(__file__).resolve().parents[1]
+BACKEND_DIR = Path(__file__).resolve().parents[1] / "backend"
 BLOB_DIR = BACKEND_DIR / "data" / "blobs"
 MAX_TEXT_BYTES = 1_000_000
 APPENDED_SENTENCE = "This sentence was appended by the mock Speech service."

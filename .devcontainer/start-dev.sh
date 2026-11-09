@@ -23,7 +23,7 @@ if ! curl -fsS http://localhost:5173/ >/dev/null 2>&1; then
     echo "Started Vite"
 fi
 
-# Both Python services share the backend virtual environment.
+# All Python services share the backend virtual environment.
 cd "$ROOT/backend"
 if [ ! -x ".venv/bin/python" ]; then
     echo "Creating Python virtual environment..."
@@ -41,11 +41,23 @@ if ! curl -fsS http://localhost:8000/api/health >/dev/null 2>&1; then
     echo "Started Uvicorn"
 fi
 
+# Launch independent mock services from the repository root.
+cd "$ROOT"
+
 # Start the standalone Speech mock (one worker, without reload).
 if ! curl -fsS http://localhost:8002/openapi.json >/dev/null 2>&1; then
-    nohup .venv/bin/python -m uvicorn services.speech_mock:app \
+    nohup backend/.venv/bin/python -m uvicorn services.speech_mock:app \
         --host 0.0.0.0 --port 8002 \
         > "$LOGS/speech-mock.log" 2>&1 < /dev/null &
 
     echo "Started Speech mock"
+fi
+
+# Start standalone object storage (one worker).
+if ! curl -fsS http://localhost:8001/openapi.json >/dev/null 2>&1; then
+    nohup backend/.venv/bin/python -m uvicorn services.storage_mock:app \
+        --host 127.0.0.1 --port 8001 --no-access-log \
+        > "$LOGS/storage-mock.log" 2>&1 < /dev/null &
+
+    echo "Started Storage mock"
 fi

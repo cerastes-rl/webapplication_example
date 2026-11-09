@@ -2,9 +2,11 @@
 
 ## Status and purpose
 
+**Standalone storage mock complete (reduced scope):** `services/storage_mock.py` implements Azure-style PUT, HEAD and DELETE on `/blobs/{name}` at port 8001. It stores text-fixture bytes on disk with a configurable 1 MB limit. No GET, grants, receipts or full service simulation is included. This user-approved interface scope supersedes the richer storage simulation proposed below. See [the storage contract](PROJECT_STRUCTURE.md#standalone-storage-mock). Application integration remains planned.
+
 **Backend SQLite read slice complete:** API startup initializes the accepted single-table database using `sqlite3`. Authenticated `GET /api/runs` and `GET /api/runs/{run_id}/transcript` enforce ownership. The database starts empty; upload writes, UI integration and workers remain planned. See the [current database guide](../README.md#local-sqlite-database). The older SQLAlchemy/multi-table proposals below are future architecture references.
 
-**Local authentication complete; user interaction review approved on 2026-11-09. Connected History and processing remain planned.** The current app combines a React preview with FastAPI health and Austin/John sign-in/me/sign-out endpoints. A separate minimal `backend/services/speech_mock.py` now reads/writes local text files under `backend/data/blobs/`, with no HTTP storage dependency. Its job dictionary is in memory; the durable service architecture below remains planned. The user approved the current UI on 2026-11-09. Responsive layout review is deferred; browser/accessibility checks and focused interaction tests remain follow-up validation. Connected History/upload integration and processing remain planned; backend reads already enforce SQL ownership.
+**Local authentication complete; user interaction review approved on 2026-11-09. Connected History and processing remain planned.** The current app combines a React preview with FastAPI health and Austin/John sign-in/me/sign-out endpoints. A separate minimal `services/speech_mock.py` now reads/writes local text files under `backend/data/blobs/`, with no HTTP storage dependency. Its job dictionary is in memory; the durable service architecture below remains planned. The user approved the current UI on 2026-11-09. Responsive layout review is deferred; browser/accessibility checks and focused interaction tests remain follow-up validation. Connected History/upload integration and processing remain planned; backend reads already enforce SQL ownership.
 
 Build one usable local journey: sign in, upload a recording, follow durable progress, read a stored sample transcript, retry a processing failure and cancel an upload. Records and audio survive reloads and service restarts. Recognition is simulated and clearly labeled.
 
@@ -19,11 +21,11 @@ This is the delivery guide for M2 in [requirements](REQUIREMENTS.md). The [imple
 | Frontend | React/TypeScript/Vite, port 5173 | UI preview and typed auth client; recording API client and actual shell-owned upload remain planned | Static Web Apps | ✅ UI complete for current scope; user approved 2026-11-09; auth integrated |
 | Application | FastAPI/Uvicorn, port 8000, one worker | Health, authentication and owner-scoped SQLite run reads; upload writes and background execution remain planned | App Service | ✅ Health, auth and run reads |
 | Application database | SQLite through built-in sqlite3 | Accepted single runs table with metadata, options, status and transcript | Azure SQL Database | ✅ Initialization and API reads; workflow writes pending |
-| Storage mock | Planned separate FastAPI process, proposed port 8001 | Upload grants, streamed bytes, object metadata and partial cleanup | Private Blob Storage | ❌ |
-| Speech mock | `backend/services/speech_mock.py`, port 8002 | Timed text processing, local source/result files, status, paginated List Files and job expiry | Azure AI Speech | ✅ Standalone local-file mock |
+| Storage mock | `services/storage_mock.py`, port 8001 | PUT/HEAD/DELETE blob interface and file bytes | Private Blob Storage | ✅ Standalone storage; application integration pending |
+| Speech mock | `services/speech_mock.py`, port 8002 | Timed text processing, local source/result files, status, paginated List Files and job expiry | Azure AI Speech | ✅ Standalone local-file mock |
 | Identity | Fixed Austin/John adapter inside the application | Local session and ownership checks for SQL reads | Microsoft Entra ID | ✅ Complete; user interaction review approved |
 
-The Speech mock currently uses `backend/data/blobs/` directly and keeps jobs in memory. It does not require the planned storage HTTP service. Durable jobs, service adapters and application integration remain planned.
+The Speech mock currently uses `backend/data/blobs/` directly and keeps jobs in memory. It does not yet call the implemented storage HTTP service. Durable jobs, service adapters and application integration remain planned.
 
 **Planned connected architecture:** the diagram below describes the later connected milestone, including HTTP storage and durable Speech jobs.
 
@@ -101,17 +103,9 @@ Enable SQLite foreign keys, a bounded busy timeout and short transactions. Use s
 
 ## 4. Upload and storage behavior
 
-1. Authorize: commit the run/file/options and generated object key, then obtain a restricted grant from storage. If grant creation fails, retain a recoverable upload error; retrying the same request ID reconciles the existing run and can restore uploading state only if the run has not been cancelled or interrupted.
-2. Transfer: the persistent React shell owns an XMLHttpRequest PUT for measured upload progress and abort support. Navigation does not unmount it. Show finalizing after bytes are sent until the application confirms readiness.
-3. Store: stream raw request chunks with bounded memory to a generated partial path. Count actual bytes, enforce the agreed maximum and declared length, validate permitted extension/type metadata, and atomically rename only a complete object. File metadata checks do not prove that audio is decodable.
-4. Complete: the application inspects storage using its private adapter and checks finalized state, object ownership/key and actual length. Commit ready state and one queued job atomically. Repeated completion after a lost response is safe.
-5. Cancel: persist cancellation first, then revoke the grant/abort or fence the storage write and delete stored bytes. Cleanup retries survive service outages. A late successful PUT must never resurrect the run.
+**Implemented local storage:** a small Azure-style PUT/HEAD/DELETE service, with no GET, authentication simulation, grant management or receipt state machine. Text-fixture uploads default to a 1,000,000-byte local limit. Temporary file writes, actual-length checks and atomic rename provide basic upload correctness. See [the current contract](PROJECT_STRUCTURE.md#standalone-storage-mock).
 
-Storage grants bind object key, expected length/type, expiry and allowed operation. Store grant/object receipts durably in storage-owned metadata so inspection works after restart. A final receipt includes verified size and completion time. Serialize writes per object, reject overwriting finalized objects, and reconcile a crash between rename and receipt persistence. Internal inspect/revoke/delete endpoints require a local service credential; browser upload/read grants cannot call them. Source-read grants are distinct from upload grants; resolve fresh source access for a new processing attempt. Keep credentials out of Git and initialize local credentials through documented configuration.
-
-Track last received bytes/time in storage, with throttled durable activity updates. Reconciliation must distinguish an active healthy slow stream, a finalized object, and an abandoned partial. Validate grant expiry when a transfer starts, then allow that healthy stream to finish unless revoked. Choose configurable inactivity and grant deadlines; do not expire an upload solely because its run is old. On storage restart, prior in-process writers are gone: retain final objects, reconcile receipts and clean abandoned partials. Revocation must be checked before final rename so cleanup cannot race a late writer into recreating cancelled audio.
-
-On application startup and periodic sweeps, inspect nonterminal uploads. Finalized valid objects can complete the existing run after a lost browser response. Active writers remain untouched. Inactive partials become interrupted and are cleaned. Never auto-complete cancelled runs. Cleanup deletes only known terminal upload objects after writers are fenced; successful source audio remains available for processing retry.
+**Next application integration (planned):** create a run/options in SQLite before transfer, return its generated blob URL, PUT bytes from the browser, then verify existence/length with HEAD before marking the SQL run queued. DELETE can remove a stored blob. Browser progress, app-level authorization, cancellation and retry semantics will be implemented separately. Azure SAS generation belongs to the application's production adapter; there is no mock grant-issuing endpoint.
 
 ## 5. Speech mock and application worker
 
@@ -161,11 +155,11 @@ Candidate maintained modules, added only as needed:
 |---|---|
 | Database, DTOs, auth and routes | `backend/src/database.py`, `backend/src/schema.sql`, `backend/api/auth.py`, `backend/api/runs.py` |
 | Workflow and external clients | `backend/src/processing.py`, `backend/src/worker.py` (when implemented) |
-| Separate mocks | `backend/services/storage_mock.py` (planned), `backend/services/speech_mock.py` |
+| Separate mocks | `services/storage_mock.py`, `services/speech_mock.py` |
 | Backend tests | `backend/tests/` |
 | Frontend API and transfer ownership | `frontend/src/api/`, `frontend/src/useUpload.ts` |
 
-Preserve `backend/main.py` and `uvicorn main:app`. Keep `backend/data/` ignored, including SQLite sidecars, grants, audio, partials and mock state, with an exception for maintained `example*` files directly inside `backend/data/blobs/audio/`. Proposed stores: application `backend/data/app.db`, storage `backend/data/uploads/` with its own receipts database, and Speech `backend/data/speech.db`. No runtime stores are committed.
+Preserve `backend/main.py` and `uvicorn main:app`. Keep `backend/data/` ignored, including SQLite sidecars, grants, audio, partials and mock state, with an exception for maintained `example*` files directly inside `backend/data/blobs/audio/`. Proposed stores: application `backend/data/app.db`, storage `backend/data/storage/` with blob files (implemented), and Speech `backend/data/speech.db`. No runtime stores are committed.
 
 Provide documented commands to start Vite and all three Python services, configure URLs/credentials, seed once, run checks, stop services and explicitly reset local data. Extend the existing startup helper after individual commands work; check ports without killing unrelated processes. Startup waits/retries for dependencies; a temporarily absent mock must not erase state. Logs identify the service and run/job but exclude credentials, grants and transcript contents.
 

@@ -36,11 +36,28 @@
       }
     },
     {
+      "label": "Start Storage Mock",
+      "type": "shell",
+      "command": "backend/.venv/bin/python -m uvicorn services.storage_mock:app --host 127.0.0.1 --port 8001 --no-access-log",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "isBackground": true,
+      "problemMatcher": [],
+      "runOptions": {
+        "runOn": "folderOpen"
+      },
+      "presentation": {
+        "panel": "dedicated",
+        "reveal": "silent"
+      }
+    },
+    {
       "label": "Start Speech Mock",
       "type": "shell",
-      "command": ".venv/bin/python -m uvicorn services.speech_mock:app --host 0.0.0.0 --port 8002",
+      "command": "backend/.venv/bin/python -m uvicorn services.speech_mock:app --host 0.0.0.0 --port 8002",
       "options": {
-        "cwd": "${workspaceFolder}/backend"
+        "cwd": "${workspaceFolder}"
       },
       "isBackground": true,
       "problemMatcher": [],

@@ -71,7 +71,7 @@ Health and local auth are implemented. The [local plan](LOCAL_IMPLEMENTATION_PLA
 | `GET /api/runs` | 200 list including run ID/options and incomplete uploads. |
 | `GET /api/runs/{run_id}/transcript` | 200 stored text/ID/time, 404 unknown run, 409 incomplete. |
 | `POST /api/uploads/authorize` | 201 creates run/upload metadata and saves options before transfer; returns run/upload IDs, restricted local transport URL/method and constraints. |
-| Storage upload URL, route pending | Raw streamed transfer to the separate storage mock. Proposed 204 stored, 404 unknown authorization, 413 oversized, 415 unsupported type. Validate actual bytes/claimed length. |
+| `PUT /blobs/{name}` on storage port 8001 | Raw streamed transfer; 201 stored/overwritten, 413 over the local limit. Require BlockBlob and Content-Length headers. |
 | `POST /api/uploads/complete` | 202 verifies stored bytes, finalizes existing run/file and creates one ready SQL job. Missing/incomplete bytes: 409. Repeated confirmation returns the same IDs/current state across restarts. |
 | `POST /api/runs/{run_id}/retry` | 202 marks eligible failed processing ready with the same recording/options. Unknown: 404; wrong state/concurrent duplicate: 409. |
 | `/api/auth/sign-in`, `/api/auth/me`, `/api/auth/sign-out` | Implemented POST/GET/POST routes for Austin/John sessions. Sign-in accepts `{"access_key":"austin"}` or `{"access_key":"john"}`. |
@@ -125,3 +125,7 @@ Replace local storage/Speech HTTP mocks and SQLite through their adapters. Produ
 ## Implemented backend SQLite read slice
 
 FastAPI initializes the accepted single `runs` table at startup using Python `sqlite3`. Authenticated run list/transcript routes enforce ownership and exclude private storage/Speech identifiers. Lists support bounded `limit`/`offset`; unknown and other-owner runs return 404, unavailable transcripts return 409, and invalid parameters return 422 with the application error envelope. Real-HTTP checks cover owner isolation, verbatim text and persistence across API restart. Database writes from uploads, worker processing and frontend History integration remain planned; preview runs remain in browser memory. The earlier SQLAlchemy/multi-table requirement describes future architecture, rather than this implemented slice.
+
+## Implemented standalone storage slice
+
+The current scope is a small Azure-style PUT/HEAD/DELETE interface backed by local files. PUT creates/overwrites with 201, HEAD returns size/properties with 200 and no body, DELETE returns 202, and missing blobs return 404. Raw requests require BlockBlob and Content-Length headers. The local text-fixture limit is configurable, default 1,000,000 bytes; empty blobs are supported as in Azure. Actual byte checks, temporary-file cleanup, atomic replacement and persistence are covered by real-HTTP tests. No GET operation, SAS/auth simulation, grant management or receipt database is included. This reduced scope supersedes the earlier full storage-simulation proposals. See [the implemented contract](PROJECT_STRUCTURE.md#standalone-storage-mock). Application/UI integration remains planned.
