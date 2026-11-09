@@ -2,7 +2,7 @@
 
 ## Status and delivery guide
 
-The React preview is implemented for review; the main FastAPI app exposes health and implemented Austin/John sign-in/me/sign-out endpoints. The standalone `backend/speech_mock.py` is also implemented: it processes local text files, writes retained results and exposes status/paginated file listings. See the [local component status table](LOCAL_IMPLEMENTATION_PLAN.md#1-small-local-architecture). Local auth and UI session integration are complete; the user approved the auth interaction review on 2026-11-09. Broader UI acceptance and explicit UI approval remain pending for connected History/upload processing.
+The React preview is implemented for review; the main FastAPI app exposes health and implemented Austin/John sign-in/me/sign-out endpoints. The standalone `backend/services/speech_mock.py` is also implemented: it processes local text files, writes retained results and exposes status/paginated file listings. See the [local component status table](LOCAL_IMPLEMENTATION_PLAN.md#1-small-local-architecture). Local auth and UI session integration are complete; the user approved the auth interaction review on 2026-11-09. Broader UI acceptance and explicit UI approval remain pending for connected History/upload processing.
 
 This document describes the application architecture and Azure end state. Use the [local implementation plan](LOCAL_IMPLEMENTATION_PLAN.md) for the ordered local delivery slices, concrete mock contracts, recovery behavior and acceptance checks. Local auth was delivered first; persistent user-owned reads follow, then upload, processing and recovery.
 

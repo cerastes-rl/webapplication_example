@@ -1,6 +1,7 @@
 """Real-HTTP checks using only the standard library and existing runtime dependencies."""
 
 import json
+import os
 import socket
 import subprocess
 import sys
@@ -13,13 +14,14 @@ from urllib.error import HTTPError, URLError
 from urllib.request import HTTPCookieProcessor, Request, build_opener
 
 
-class AuthTests(unittest.TestCase):
+class ApiTestCase(unittest.TestCase):
     @classmethod
     def start_server(cls):
         cls.server = subprocess.Popen(
             [sys.executable, "-m", "uvicorn", "main:app", "--host", "127.0.0.1",
              "--port", str(cls.port), "--log-level", "warning"],
             cwd=Path(__file__).resolve().parents[1], stdout=cls.logs, stderr=cls.logs,
+            env={**os.environ, "SSSCRIBE_DATABASE_PATH": str(cls.database_path)},
         )
         for _ in range(100):
             try:
@@ -33,6 +35,8 @@ class AuthTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        cls.data_dir = tempfile.TemporaryDirectory()
+        cls.database_path = Path(cls.data_dir.name) / "app.db"
         with socket.socket() as listener:
             listener.bind(("127.0.0.1", 0))
             cls.port = listener.getsockname()[1]
@@ -45,6 +49,7 @@ class AuthTests(unittest.TestCase):
         cls.server.terminate()
         cls.server.wait(timeout=5)
         cls.logs.close()
+        cls.data_dir.cleanup()
 
     @classmethod
     def call(cls, client, path, body=None, method=None, headers=None):
@@ -65,6 +70,8 @@ class AuthTests(unittest.TestCase):
         jar = CookieJar()
         return build_opener(HTTPCookieProcessor(jar)), jar
 
+
+class AuthTests(ApiTestCase):
     def test_health_and_signed_out_user(self):
         client, _ = self.client()
         self.assertEqual(self.call(client, "/api/health")[:2], (200, {"status": "OK!"}))

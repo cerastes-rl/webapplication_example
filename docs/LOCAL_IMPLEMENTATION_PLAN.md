@@ -2,7 +2,9 @@
 
 ## Status and purpose
 
-**Local authentication complete; user interaction review approved on 2026-11-09. Connected History and processing remain planned.** The current app combines a React preview with FastAPI health and Austin/John sign-in/me/sign-out endpoints. A separate minimal `backend/speech_mock.py` now reads/writes local text files under `backend/data/blobs/`, with no HTTP storage dependency. Its job dictionary is in memory; the durable service architecture below remains planned. The user approved the current UI on 2026-11-09. Responsive layout review is deferred; browser/accessibility checks and focused interaction tests remain follow-up validation. Connected History/upload integration, SQL persistence and ownership filtering remain planned.
+**Backend SQLite read slice complete:** API startup initializes the accepted single-table database using `sqlite3`. Authenticated `GET /api/runs` and `GET /api/runs/{run_id}/transcript` enforce ownership. The database starts empty; upload writes, UI integration and workers remain planned. See the [current database guide](../README.md#local-sqlite-database). The older SQLAlchemy/multi-table proposals below are future architecture references.
+
+**Local authentication complete; user interaction review approved on 2026-11-09. Connected History and processing remain planned.** The current app combines a React preview with FastAPI health and Austin/John sign-in/me/sign-out endpoints. A separate minimal `backend/services/speech_mock.py` now reads/writes local text files under `backend/data/blobs/`, with no HTTP storage dependency. Its job dictionary is in memory; the durable service architecture below remains planned. The user approved the current UI on 2026-11-09. Responsive layout review is deferred; browser/accessibility checks and focused interaction tests remain follow-up validation. Connected History/upload integration and processing remain planned; backend reads already enforce SQL ownership.
 
 Build one usable local journey: sign in, upload a recording, follow durable progress, read a stored sample transcript, retry a processing failure and cancel an upload. Records and audio survive reloads and service restarts. Recognition is simulated and clearly labeled.
 
@@ -15,11 +17,11 @@ This is the delivery guide for M2 in [requirements](REQUIREMENTS.md). The [imple
 | Component | Local implementation | Owns | Azure equivalent | Implemented |
 |---|---|---|---|---|
 | Frontend | React/TypeScript/Vite, port 5173 | UI preview and typed auth client; recording API client and actual shell-owned upload remain planned | Static Web Apps | ✅ UI complete for current scope; user approved 2026-11-09; auth integrated |
-| Application | FastAPI/Uvicorn, port 8000, one worker | Health and authentication; recording business rules, application SQL and background execution remain planned | App Service | ✅ Health + auth only |
-| Application database | Planned SQLite through SQLAlchemy | Runs, files, jobs, transcripts | Azure SQL Database | ❌ |
+| Application | FastAPI/Uvicorn, port 8000, one worker | Health, authentication and owner-scoped SQLite run reads; upload writes and background execution remain planned | App Service | ✅ Health, auth and run reads |
+| Application database | SQLite through built-in sqlite3 | Accepted single runs table with metadata, options, status and transcript | Azure SQL Database | ✅ Initialization and API reads; workflow writes pending |
 | Storage mock | Planned separate FastAPI process, proposed port 8001 | Upload grants, streamed bytes, object metadata and partial cleanup | Private Blob Storage | ❌ |
-| Speech mock | `backend/speech_mock.py`, port 8002 | Timed text processing, local source/result files, status, paginated List Files and job expiry | Azure AI Speech | ✅ Standalone local-file mock |
-| Identity | Fixed Austin/John adapter inside the application | Local session; SQL ownership checks remain planned | Microsoft Entra ID | ✅ Complete; user interaction review approved |
+| Speech mock | `backend/services/speech_mock.py`, port 8002 | Timed text processing, local source/result files, status, paginated List Files and job expiry | Azure AI Speech | ✅ Standalone local-file mock |
+| Identity | Fixed Austin/John adapter inside the application | Local session and ownership checks for SQL reads | Microsoft Entra ID | ✅ Complete; user interaction review approved |
 
 The Speech mock currently uses `backend/data/blobs/` directly and keeps jobs in memory. It does not require the planned storage HTTP service. Durable jobs, service adapters and application integration remain planned.
 
@@ -63,7 +65,6 @@ Use Pydantic DTOs and a small typed frontend client. Return UTC timestamps, stab
 | `GET /api/auth/me` | Return `{id, name}`; 401 without a valid session. Implemented. |
 | `POST /api/auth/sign-out` | Revoke the session and clear its cookie. Implemented. |
 | `GET /api/runs` | History including incomplete uploads, saved options, state and allowed actions. |
-| `GET /api/runs/{run_id}` | Details for exactly one run. |
 | `GET /api/runs/{run_id}/transcript` | Stored readable text and metadata; 409 until available. |
 | `POST /api/uploads/authorize` | Create run/file metadata before transfer; return run ID, upload ID, restricted URL/method, required headers and expiry. |
 | `POST /api/uploads/complete` | Accept upload ID, verify storage and commit readiness once. Return current run state; repeated calls return the existing records. |
@@ -72,7 +73,7 @@ Use Pydantic DTOs and a small typed frontend client. Return UTC timestamps, stab
 
 Authorization requests include a client-generated request ID. Enforce uniqueness per owner so retrying a lost authorization response does not create another run. Verify repeated requests match the original metadata/options. Resume a lost completion response by fetching run state and repeating completion, not by automatically uploading again. Return a DTO with run ID, file ID, filename, declared/verified byte counts, options, timestamps, state, failure stage, attempt count and allowed actions. Keep object keys, grants and Speech IDs out of ordinary History/detail DTOs; grants appear only in the authorization response.
 
-Implemented in `backend/auth.py`: exact keys `austin` and `john` map to stable user IDs with those same values. An opaque HttpOnly, SameSite=Lax cookie (path `/api`) identifies an in-memory session. The frontend uses the Vite proxy, restores the session on load and handles invalid keys/backend outages. Sign-out resets shared preview state. Restarting FastAPI invalidates sessions. SQL owner filtering remains deferred; existing preview History is explicitly shared sample data. Storage uses scoped grants rather than application cookies. Do not build a user-management system.
+Implemented in `backend/api/auth.py`: exact keys `austin` and `john` map to stable user IDs with those same values. An opaque HttpOnly, SameSite=Lax cookie (path `/api`) identifies an in-memory session. The frontend uses the Vite proxy, restores the session on load and handles invalid keys/backend outages. Sign-out resets shared preview state. Restarting FastAPI invalidates sessions. SQL owner filtering remains deferred; existing preview History is explicitly shared sample data. Storage uses scoped grants rather than application cookies. Do not build a user-management system.
 
 ### Application database
 
@@ -158,9 +159,9 @@ Candidate maintained modules, added only as needed:
 
 | Area | Proposed location |
 |---|---|
-| Database, DTOs, auth and routes | `backend/database.py`, `models.py`, `schemas.py`, `auth.py`, `routes/` |
-| Workflow and external clients | `backend/services/`, `backend/adapters/`, `backend/worker.py` |
-| Separate mocks | `backend/mocks/storage/`, `backend/mocks/speech/` |
+| Database, DTOs, auth and routes | `backend/src/database.py`, `backend/src/schema.sql`, `backend/api/auth.py`, `backend/api/runs.py` |
+| Workflow and external clients | `backend/src/processing.py`, `backend/src/worker.py` (when implemented) |
+| Separate mocks | `backend/services/storage_mock.py` (planned), `backend/services/speech_mock.py` |
 | Backend tests | `backend/tests/` |
 | Frontend API and transfer ownership | `frontend/src/api/`, `frontend/src/useUpload.ts` |
 

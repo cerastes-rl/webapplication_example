@@ -64,12 +64,14 @@ python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
 - `GET http://localhost:8000/api/health` → `{"status":"OK!"}`.
 - FastAPI OpenAPI UI: http://localhost:8000/docs.
 - `POST /api/auth/sign-in` with `{"access_key":"austin"}` or `{"access_key":"john"}` returns the user and sets an HttpOnly session cookie.
+- `GET /api/runs` reads the signed-in user’s persisted runs (newest first; `limit=50`, maximum 100, and `offset=0`).
+- `GET /api/runs/{run_id}/transcript` returns `{run_id, transcript_text}` verbatim for a completed run; unavailable transcripts return 409.
 - `GET /api/auth/me` restores the user; signed-out/unknown sessions return 401.
 - `POST /api/auth/sign-out` revokes the session and clears the cookie.
 
-Use one Uvicorn worker. Sessions live in memory: browser refresh preserves sign-in, while restarting the API requires signing in again. The UI shows shared preview records for both users. Run/file ownership will be enforced through SQL later.
+Use one Uvicorn worker. Sessions live in memory: browser refresh preserves sign-in, while restarting the API requires signing in again. The run read API enforces SQL ownership; the UI still shows shared preview records for both users.
 
-Run backend auth checks from the repository root:
+Run backend auth and SQLite API checks from the repository root:
 
 ```bash
 backend/.venv/bin/python -m unittest discover -s backend/tests -v
@@ -86,20 +88,22 @@ See the [project structure guide](docs/PROJECT_STRUCTURE.md) for the source tree
 Create the database from the repository root using the existing Python environment:
 
 ```bash
-backend/.venv/bin/python backend/database.py
+backend/.venv/bin/python backend/src/database.py
 ```
 
-VS Code also runs this initialization on folder open through the **Initialize Database** task. This creates `backend/data/databases/app.db` with one empty `runs` table on first initialization. Repeating the command preserves existing rows. The database and its sidecars are ignored by Git; `backend/schema.sql` is the maintained schema and `backend/database.py` initializes it using Python's built-in SQLite support.
+VS Code also runs this initialization on folder open through the **Initialize Database** task. This creates `backend/data/databases/app.db` with one empty `runs` table on first initialization. Repeating the command preserves existing rows. The API also initializes the database during startup, preserving existing rows. Set `SSSCRIBE_DATABASE_PATH` to an absolute file path to use a different local database (including with the initialization command). The database and its sidecars are ignored by Git at the default location; keep alternate stores under ignored `backend/data/` or outside the checkout. `backend/src/schema.sql` is the maintained schema and `backend/src/database.py` initializes it using Python's built-in SQLite support.
 
 The table stores sequential run IDs, ownership, source metadata, saved options, application/Speech statuses, transcript text, errors and UTC timestamps. Speech statuses match the current mock: `NotStarted`, `Running`, `Succeeded`, `Failed`. Nullable fields remain `NULL` until known; Automatic speakers is `NULL`, and booleans use `0`/`1`. Inserts default to `uploading`, `en-US`, enabled speaker labels/timestamps and current UTC timestamps. Future application updates must set `updated_at` explicitly.
 
-Database creation is implemented. API access, worker processing and UI persistence remain pending. The accepted single-table schema supersedes the earlier multi-table proposal for the current local slice. Re-running initialization creates missing tables; it does not migrate an existing schema.
+SQLite initialization and authenticated read API access are implemented using Python's built-in `sqlite3`; no new dependencies are required. Read routes return typed JSON, UTC timestamps, booleans and nullable unknown fields. Storage keys, Speech IDs and transcript bodies are excluded from run lists. Protected responses use `Cache-Control: no-store`; errors use `{error: {code, message}}`, including invalid request parameters (422).
+
+The database starts empty; this step adds no seed data or write routes. Sign in at `http://localhost:8000/docs`, then try the run routes there. `GET /api/runs` returns an empty array until records exist. The UI and Begin upload still use browser-memory preview runs. Upload writes, worker processing and UI persistence remain pending. Tests create isolated temporary databases with fixtures, verify ownership and verbatim transcripts, and restart the API to confirm rows persist while sessions expire. The accepted single-table schema supersedes the earlier multi-table proposal for the current local slice. Re-running initialization creates missing tables; it does not migrate an existing schema.
 
 ## Run the standalone Speech mock
 
 ```bash
 cd backend
-.venv/bin/python -m uvicorn speech_mock:app --host 127.0.0.1 --port 8002
+.venv/bin/python -m uvicorn services.speech_mock:app --host 127.0.0.1 --port 8002
 ```
 
 Open http://localhost:8002/docs. Port 8002 is included in dev-container forwarding; rebuild the container to apply configuration changes. The Speech startup task runs without reload so code edits do not reset in-memory jobs; restart the task to apply Speech code changes. This standalone mock reads/writes local files; it needs no storage service. Paths are relative to `backend/` and must stay under `data/blobs/`. A leading slash is optional and still means a backend-relative mock path.

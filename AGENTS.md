@@ -23,7 +23,7 @@ The UI preview is implemented for review. It restores an Austin/John backend ses
 - Reload resets preview runs, form and navigation, then restores identity through `/api/auth/me`. Sign-out and each new sign-in reset preview runs. Theme persists under `ssscribe-theme` when localStorage is available.
 - Simulation continues across internal navigation and pauses while signed out or an auth request is pending. History remains shared sample data; SQL user filtering is deferred.
 - The picker accepts non-empty MP3/WAV up to **4,000,000,000 bytes inclusive**, checking extension and size. Requested speakers are Automatic or 1–10, language English, speaker labels/timestamps default on.
-- Main FastAPI exposes health plus `/api/auth/sign-in`, `/api/auth/me` and `/api/auth/sign-out`. Access keys and stable IDs are exactly `austin` and `john`; sessions are in memory with an HttpOnly cookie. Restart requires sign-in. `backend/auth.py` exposes `get_current_user` for future SQL ownership checks.
+- Main FastAPI exposes health plus `/api/auth/sign-in`, `/api/auth/me` and `/api/auth/sign-out`. Access keys and stable IDs are exactly `austin` and `john`; sessions are in memory with an HttpOnly cookie. Restart requires sign-in. `backend/api/auth.py` exposes `get_current_user` for future SQL ownership checks.
 
 **Current UI is complete for this scope; the user explicitly approved it on 2026-11-09. Local Austin/John auth and its interaction review are also complete. Responsive layout review is deferred; browser/accessibility checks and focused interaction tests remain follow-up validation. The UI approval gate is satisfied; connected History/upload integration remains planned and requires its own implementation request.**
 

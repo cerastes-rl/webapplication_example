@@ -43,7 +43,7 @@ fi
 
 # Start the standalone Speech mock (one worker, without reload).
 if ! curl -fsS http://localhost:8002/openapi.json >/dev/null 2>&1; then
-    nohup .venv/bin/python -m uvicorn speech_mock:app \
+    nohup .venv/bin/python -m uvicorn services.speech_mock:app \
         --host 0.0.0.0 --port 8002 \
         > "$LOGS/speech-mock.log" 2>&1 < /dev/null &
 

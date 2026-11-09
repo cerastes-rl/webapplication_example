@@ -3,7 +3,7 @@
 ## Milestones
 
 - **M1 — UI preview:** implemented for review. React/TypeScript/Vite, navy branding, light/dark themes, Upload/History navigation, mock identity, simulated progress and sample details. Browser/accessibility review, focused tests and UI approval are the current acceptance tasks.
-- **Current backend:** health plus Austin/John sign-in/me/sign-out with in-memory cookie sessions. Vite's `/api` proxy and dev-container ports 5173/8000 are configured.
+- **Current backend:** health, Austin/John sign-in/me/sign-out with in-memory cookie sessions, and owner-scoped SQLite run list/transcript reads. Vite's `/api` proxy and dev-container ports 5173/8000 are configured.
 - **Standalone Speech mock — implemented:** local UTF-8 text input, timed states, retained result/report JSON, status and paginated List Files. Only in-memory jobs expire after 30 minutes; application integration and durable jobs remain planned. See the [component status table](LOCAL_IMPLEMENTATION_PLAN.md#1-small-local-architecture).
 - **M2 — connected local application:** local authentication is complete, with user interaction approval recorded on 2026-11-09; SQL History/upload processing remains planned after UI approval. FastAPI/SQLite own records and workflow state, a storage HTTP mock persists audio, and a Speech HTTP mock returns deterministic batch results. FastAPI lifespan loops query SQL and execute submission, monitoring, import and recovery logic.
 - **P1 — follow-ups:** filename/status search, transcript copy/download and transcript search.
@@ -69,7 +69,6 @@ Health and local auth are implemented. The [local plan](LOCAL_IMPLEMENTATION_PLA
 |---|---|
 | `GET /api/health` | 200 `{"status":"OK!"}`. |
 | `GET /api/runs` | 200 list including run ID/options and incomplete uploads. |
-| `GET /api/runs/{run_id}` | 200 run/file state, 404 unknown; supports pre-transfer records. |
 | `GET /api/runs/{run_id}/transcript` | 200 stored text/ID/time, 404 unknown run, 409 incomplete. |
 | `POST /api/uploads/authorize` | 201 creates run/upload metadata and saves options before transfer; returns run/upload IDs, restricted local transport URL/method and constraints. |
 | Storage upload URL, route pending | Raw streamed transfer to the separate storage mock. Proposed 204 stored, 404 unknown authorization, 413 oversized, 415 unsupported type. Validate actual bytes/claimed length. |
@@ -122,3 +121,7 @@ Replace local storage/Speech HTTP mocks and SQLite through their adapters. Produ
 - **NEXT-01:** filename search and status filters with distinct empty/no-match states.
 - **NEXT-02:** copy/plain-text download of retrieved transcripts with failure feedback.
 - **NEXT-03:** search within a transcript.
+
+## Implemented backend SQLite read slice
+
+FastAPI initializes the accepted single `runs` table at startup using Python `sqlite3`. Authenticated run list/transcript routes enforce ownership and exclude private storage/Speech identifiers. Lists support bounded `limit`/`offset`; unknown and other-owner runs return 404, unavailable transcripts return 409, and invalid parameters return 422 with the application error envelope. Real-HTTP checks cover owner isolation, verbatim text and persistence across API restart. Database writes from uploads, worker processing and frontend History integration remain planned; preview runs remain in browser memory. The earlier SQLAlchemy/multi-table requirement describes future architecture, rather than this implemented slice.

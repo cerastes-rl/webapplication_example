@@ -5,7 +5,7 @@ Maintained files, responsibilities and common editing locations. See [README](..
 ## Quick orientation
 
 - **`frontend/`:** React UI preview with in-memory runs and simulated progress.
-- **`backend/`:** health/auth API and a separate standalone Speech mock.
+- **`backend/`:** health/auth and SQLite run read API, plus a separate standalone Speech mock.
 - **`docs/`:** requirements, architecture, delivery plan and research.
 - **`.devcontainer/`, `.vscode/`, `.github/`:** development and repository configuration.
 
@@ -56,12 +56,17 @@ SSScribe/                            Repository root (actual checkout name may d
 |         |--- favicon.svg           Favicon referenced by index.html
 |
 |--- backend/                        Python/FastAPI application API and standalone mock
-|    |--- main.py                    FastAPI app, health, auth router and HTTP errors
-|    |--- database.py                Explicit SQLite initialization command
-|    |--- schema.sql                 Accepted single-table runs schema
-|    |--- auth.py                    Austin/John sessions and reusable current-user dependency
-|    |--- tests/test_auth.py         Standard-library auth tests over real HTTP
-|    |--- speech_mock.py             Separate batch mock: submit, timed states, result files and expiry
+|    |--- main.py                    FastAPI lifespan, health, routers and normalized request errors
+|    |--- api/                       Application HTTP endpoints
+|    |    |--- auth.py               Austin/John sessions, routes and current-user dependency
+|    |    |--- runs.py               Run list/transcript response models and authenticated read routes
+|    |--- src/                       Application logic and database access
+|    |    |--- database.py           SQLite initialization, connections and owner-scoped reads
+|    |    |--- schema.sql            Accepted single-table runs schema
+|    |--- services/                  Independently running mock services
+|    |    |--- speech_mock.py        Batch mock: submit, timed states, result files and expiry
+|    |--- tests/test_auth.py         Shared isolated HTTP server harness and auth checks
+|    |--- tests/test_runs.py         SQL ownership, paging, transcript, validation and restart checks
 |    |--- data/blobs/audio/example*   Version-controlled text fixtures, including example1.txt–example5.txt
 |    |--- requirements.txt           Pinned Python runtime dependencies
 |
@@ -111,7 +116,7 @@ SSScribe/                            Repository root (actual checkout name may d
 - **Vite:** React plugin, port 5173 and `/api` proxy to `http://localhost:8000`. `public/` files are served at root paths; imported source assets are bundled.
 - **Backend:** `main.py` exports `app` for `uvicorn main:app`. `requirements.txt` pins FastAPI/Uvicorn/Pydantic and supporting dependencies. Use `backend/.venv` and pip requirements.
 - **Dev container:** Python image with Node/pnpm, ports 5173/8000/8002. On creation, `postCreateCommand` creates/reuses the venv and installs requirements. Rebuild to apply setup changes; rerun pip after requirements changes. The lockfile records resolved feature metadata.
-- **Startup:** `.vscode/tasks.json` defines folder-open tasks for Vite, the API, Speech mock and **Initialize Database** (`.venv/bin/python database.py` from `backend/`). Database initialization runs once per folder open and preserves existing rows. Speech runs on port 8002 without reload to preserve in-memory jobs during code edits. `.devcontainer/start-dev.sh` starts missing services and logs to `.devcontainer/logs/` (`speech-mock.log` for Speech). It installs requirements when creating a missing venv. Install frontend dependencies with pnpm and update existing venvs explicitly.
+- **Startup:** `.vscode/tasks.json` defines folder-open tasks for Vite, the API, Speech mock and **Initialize Database** (`.venv/bin/python src/database.py` from `backend/`). Database initialization runs once per folder open and preserves existing rows. Speech runs on port 8002 without reload to preserve in-memory jobs during code edits. `.devcontainer/start-dev.sh` starts missing services and logs to `.devcontainer/logs/` (`speech-mock.log` for Speech). It installs requirements when creating a missing venv. Install frontend dependencies with pnpm and update existing venvs explicitly.
 - **Checks:** `.oxlintrc.json` owns lint rules; `tsconfig*.json` owns TypeScript configuration.
 - **Repository automation:** `.github/dependabot.yml` configures dependency updates.
 
@@ -140,7 +145,8 @@ src/main.tsx -> imports index.css -> mounts App.tsx
 
 Application API:
 backend/main.py -> GET /api/health -> {"status":"OK!"}
-                -> auth.py -> sign-in / me / sign-out -> in-memory cookie sessions
+                -> api/auth.py -> sign-in / me / sign-out -> in-memory cookie sessions
+                -> api/runs.py -> src/database.py -> owner-filtered SQLite run/transcript reads
 ```
 
 The app restores a backend session or opens the Austin/John access-key form. React state owns navigation; the shell timer continues across page changes. Leaving Upload resets the form. Sign-out confirms cancellation of simulated transfers, revokes the backend session and resets preview state. Reload restores initial preview runs/page and checks the backend session; theme preference persists under `ssscribe-theme`.
@@ -169,7 +175,8 @@ All frontend paths in this table are relative to `frontend/` unless otherwise no
 | Browser metadata or favicon | `index.html`, `public/favicon.svg` |
 | Frontend dependencies or package scripts | `package.json` and pnpm-managed `pnpm-lock.yaml` |
 | Development proxy/port | `vite.config.ts`; align root startup docs, `.vscode/tasks.json` and helper configuration as applicable |
-| Current Python endpoints | Repository-root `backend/main.py` |
+| Current Python endpoints | Repository-root `backend/main.py`, `backend/api/auth.py` and `backend/api/runs.py` |
+| SQLite queries and startup path | `backend/src/database.py`; optional `SSSCRIBE_DATABASE_PATH` override |
 | Python dependencies | Repository-root `backend/requirements.txt`, installed into existing venv |
 | Startup/environment troubleshooting | Root README, `.vscode/tasks.json`, `.devcontainer/start-dev.sh`, `.devcontainer/devcontainer.json` |
 | Product scope or implementation status | `docs/REQUIREMENTS.md`, `docs/IMPLEMENTATION_PLAN.md`, root/frontend READMEs |
@@ -184,7 +191,7 @@ All frontend paths in this table are relative to `frontend/` unless otherwise no
 | `frontend/dist/` | Generated production build. Ignored; recreate with `pnpm build`. |
 | `backend/.venv/` | Local Python environment. Ignored; recreate with venv/pip. |
 | `backend/__pycache__/`, `*.pyc` | Generated Python bytecode, ignored. |
-| `backend/data/databases/app.db` | Local SQLite runs table, created with `backend/.venv/bin/python backend/database.py`; database and sidecars ignored. |
+| `backend/data/databases/app.db` | Local SQLite runs table, initialized on API startup or with `backend/.venv/bin/python backend/src/database.py`; database and sidecars ignored. |
 | `backend/data/` | Local stores are ignored except `example*` files directly inside `blobs/audio/`. `blobs/audio/` contains local text sources and `blobs/transcripts/` can hold Speech mock results. Job expiry never deletes files. |
 | `.devcontainer/logs/` | Helper logs (`vite.log`, `uvicorn.log`), ignored. |
 | Other editor caches / TypeScript build metadata | Tool output; handled by the applicable ignore rules. |
@@ -193,13 +200,13 @@ Root `.gitignore` and `frontend/.gitignore` define exclusions. Only `example*` f
 
 ## Standalone Speech mock
 
-`backend/speech_mock.py` runs on port 8002 with existing Python dependencies and no storage service. It owns an in-memory job dictionary and a lifespan maintenance task. Submissions use local paths under `backend/data/blobs/` in `contentUrls` and `properties.destinationContainerUrl`. After simulated processing, it reads UTF-8 text, appends a fixed sentence and writes result/report JSON to the destination/job-ID directory. List Files returns metadata/download URLs with `skip`/`top` pagination and `@nextLink`, without reading contents. The same app serves downloads at `/blobs/`. File work runs in a thread; jobs are processed sequentially. Job metadata expires after 30 minutes or restart; files remain. See [startup and limitations](../README.md#run-the-standalone-speech-mock). Durable jobs and production storage adapters remain later work.
+`backend/services/speech_mock.py` runs on port 8002 with existing Python dependencies and no storage service. It owns an in-memory job dictionary and a lifespan maintenance task. Submissions use local paths under `backend/data/blobs/` in `contentUrls` and `properties.destinationContainerUrl`. After simulated processing, it reads UTF-8 text, appends a fixed sentence and writes result/report JSON to the destination/job-ID directory. List Files returns metadata/download URLs with `skip`/`top` pagination and `@nextLink`, without reading contents. The same app serves downloads at `/blobs/`. File work runs in a thread; jobs are processed sequentially. Job metadata expires after 30 minutes or restart; files remain. See [startup and limitations](../README.md#run-the-standalone-speech-mock). Durable jobs and production storage adapters remain later work.
 
 ## Planned connected structure
 
-The [local architecture status table](LOCAL_IMPLEMENTATION_PLAN.md#1-small-local-architecture) tracks implemented components. Auth and its typed frontend client are complete; the user approved the auth interaction review and current UI on 2026-11-09. Responsive layout review is deferred; connected workflow integration and validation remain planned. Future modules cover recording routes/client, SQLAlchemy models, upload/storage adapters, a Speech client and lifespan-managed SQL polling loops. Separate storage and Speech HTTP mocks own audio and simulated service jobs/results. Main FastAPI owns application SQL and business logic.
+The [local architecture status table](LOCAL_IMPLEMENTATION_PLAN.md#1-small-local-architecture) tracks implemented components. Auth and its typed frontend client are complete; the user approved the auth interaction review and current UI on 2026-11-09. Responsive layout review is deferred; connected workflow integration and validation remain planned. Run read routes now use the accepted single-table SQLite schema through `sqlite3`. Frontend recording requests, upload/storage adapters, a Speech client and lifespan-managed SQL polling loops remain planned. Separate storage and Speech HTTP mocks own audio and simulated service jobs/results. Main FastAPI owns application SQL and business logic.
 
-The current database is `backend/data/databases/app.db`, initialized by `backend/database.py` manually or through the VS Code folder-open task from `backend/schema.sql`. It contains the accepted single `runs` table with sequential IDs, ownership, file metadata, options, application and Speech statuses, transcript, error and UTC timestamps. Application updates must set `updated_at`. Initialization preserves existing rows and does not perform schema migrations. API/worker/UI integration is pending; the older multi-table and scheduling-field proposals are future planning references. `backend/data/uploads/` remains proposed. Local data and database sidecars are already ignored. See the [local implementation plan](LOCAL_IMPLEMENTATION_PLAN.md) for candidate modules, contracts and delivery order, and the [architecture plan](IMPLEMENTATION_PLAN.md) for the Azure end state.
+The current database is `backend/data/databases/app.db`, initialized by `backend/src/database.py` manually or through the VS Code folder-open task from `backend/src/schema.sql`. It contains the accepted single `runs` table with sequential IDs, ownership, file metadata, options, application and Speech statuses, transcript, error and UTC timestamps. Application updates must set `updated_at`. Initialization preserves existing rows and does not perform schema migrations. Authenticated run list/transcript reads are implemented in `backend/api/runs.py`; `main.py` initializes the configured database in its lifespan. Synchronous routes perform SQL work in FastAPI’s thread pool with task-local connections and a five-second busy timeout. Lists use `limit`/`offset` and order by creation time then ID descending. Tests use temporary databases and never write to the developer’s database. API writes, worker and UI integration remain pending; the older multi-table and scheduling-field proposals are future planning references. `backend/data/uploads/` remains proposed. Local data and database sidecars are already ignored. See the [local implementation plan](LOCAL_IMPLEMENTATION_PLAN.md) for candidate modules, contracts and delivery order, and the [architecture plan](IMPLEMENTATION_PLAN.md) for the Azure end state.
 
 See the [frontend source layout](../frontend/README.md#source-layout) for module responsibilities and the sign-in call path.
 
