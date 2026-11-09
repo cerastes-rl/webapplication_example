@@ -1,0 +1,3 @@
+Lecture notes
+
+A reliable workflow records its progress before moving to the next stage. If a task stops, it can continue from the last recorded point.
