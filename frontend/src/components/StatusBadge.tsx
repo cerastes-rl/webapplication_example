@@ -1,4 +1,4 @@
-import type { Status } from '../preview'
+import type { Status } from '../run'
 
 export function StatusBadge({ status }: { status: Status | 'waiting' | 'not-started' }) {
   return (

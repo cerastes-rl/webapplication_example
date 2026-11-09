@@ -19,11 +19,11 @@ SSScribe is a React UI preview for submitting recordings, following simulated pr
 - MP3/WAV picker with extension and size validation (also accepts `.txt` without changing the displayed guidance): non-empty files up to **1 GB**.
 - Requested speakers: Automatic or 1–10. Language: English. Speaker labels and timestamps default on.
 - Begin upload creates an in-memory Run ID and navigates to History. Simulated progress continues across internal navigation: uploading → finalizing → queued → processing → completed.
-- History temporarily includes 64 sample recordings for pagination review (`EXTRA_HISTORY_EXAMPLES` in `frontend/src/config.ts` controls the extra 60), saved options, separate upload/transcription statuses, View transcript/Retry/Cancel buttons and sample transcript details. Pagination offers 10, 25 or 50 recordings per page, with filename search and sortable Submitted and Size columns (newest first by default).
+- History temporarily includes 64 sample recordings for pagination review (`EXTRA_HISTORY_EXAMPLES` in `frontend/src/preview.ts` controls the extra 60), saved options, separate upload/transcription statuses, View transcript/Retry/Cancel buttons and sample transcript details. Pagination offers 10, 25 or 50 recordings per page, with filename search and sortable Submitted and Size columns (newest first by default).
 - Upload cancellation asks for confirmation from History and details.
 - Sign-out confirms cancellation of active simulated transfers, revokes the backend session and clears the preview workspace. Each sign-in starts fresh shared sample runs; SQL ownership filtering is planned.
 - Recording details show the transcript beside recording metadata, upload/transcription statuses and saved transcription settings. Completed transcripts can be copied or downloaded as identical plain text.
-- The shared footer displays the development version configured in `frontend/src/config.ts`.
+- The footer and sidebar use the version in `frontend/package.json`.
 - Theme toggle, responsive layout, scrollable History table, labeled controls, skip link, focus styles and reduced-motion support.
 
 Reloading restores initial preview runs, navigation and form, then checks the backend session to restore identity. All completed runs use the shared sample transcript. The user approved the current UI on 2026-11-09. Responsive layout review is deferred; browser/accessibility checks and focused interaction tests remain follow-up work.
@@ -79,7 +79,7 @@ The dev container forwards 5173/8000/8002. On container creation, `postCreateCom
 
 `.vscode/tasks.json` defines folder-open startup tasks for Vite, the main FastAPI app, the Speech mock and database initialization. You can also run **Start Speech Mock** from VS Code's Run Task menu. `.devcontainer/start-dev.sh` starts missing services and writes logs under `.devcontainer/logs/`, including `speech-mock.log`. It installs Python requirements when creating a missing venv; update existing environments explicitly. Install frontend dependencies with pnpm.
 
-See the [project structure guide](docs/PROJECT_STRUCTURE.md) for the source tree and editing map. Frontend UI components live in `src/components/`, static images in `src/assets/` and auth requests in `src/api/`; `App.tsx` coordinates shared state and navigation.
+See the [project structure guide](docs/PROJECT_STRUCTURE.md) for the source tree and editing map. Frontend UI components live in `src/components/` and auth requests in `src/api/`. `App.tsx` coordinates shared state and navigation; `run.ts` defines the run contract and display helpers, `history.ts` defines History preferences, and `preview.ts` owns fixtures and simulation.
 
 ## Local SQLite database
 

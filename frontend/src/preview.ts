@@ -1,29 +1,9 @@
-import { EXTRA_HISTORY_EXAMPLES } from './config'
+import type { Run } from './run.ts'
 
-export type Status =
-  | 'uploading'
-  | 'finalizing'
-  | 'queued'
-  | 'processing'
-  | 'completed'
-  | 'failed'
-  | 'cancelled'
-export interface Run {
-  id: string
-  filename: string
-  size: number
-  created: string
-  speakers: number | null
-  language: string
-  labels: boolean
-  timestamps: boolean
-  status: Status
-  progress: number
-  attempts: number
-  error?: string
-}
-export const MAX_FILE_SIZE = 1_000_000_000
-export const sampleTranscript = [
+// Set to 0 after the History pagination review.
+export const EXTRA_HISTORY_EXAMPLES = 60
+
+const sampleTranscript = [
   {
     speaker: 'Speaker 1',
     time: '00:00:00',
@@ -45,7 +25,7 @@ export const sampleTranscript = [
     text: 'That sounds good. Let’s review the initial design together and capture any changes before moving on to the next phase.'
   }
 ]
-export const initialRuns: Run[] = [
+const sampleRuns: Run[] = [
   {
     id: 'RUN-2026-0042',
     filename: 'Product discovery session.mp3',
@@ -121,20 +101,11 @@ export const initialRuns: Run[] = [
     }
   })
 ]
-export function formatSize(bytes: number) {
-  return bytes >= 1_000_000_000
-    ? `${(bytes / 1_000_000_000).toFixed(1)} GB`
-    : `${(bytes / 1_000_000).toFixed(1)} MB`
-}
-export function formatDate(date: string) {
-  return new Intl.DateTimeFormat(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  }).format(new Date(date))
-}
+export const initialRuns: Run[] = sampleRuns.map((run) => ({
+  ...run,
+  transcript: run.status === 'completed' ? createSampleTranscript(run) : undefined
+}))
+
 export function advanceRuns(runs: Run[]): Run[] {
   return runs.map((run) => {
     if (run.status === 'uploading') {
@@ -147,40 +118,13 @@ export function advanceRuns(runs: Run[]): Run[] {
     }
     if (run.status === 'finalizing') return { ...run, status: 'queued' }
     if (run.status === 'queued') return { ...run, status: 'processing' }
-    if (run.status === 'processing') return { ...run, status: 'completed' }
+    if (run.status === 'processing')
+      return { ...run, status: 'completed', transcript: createSampleTranscript(run) }
     return run
   })
 }
 
-export function getRunStatuses(run: Run): {
-  upload: Status
-  transcription: Status | 'waiting' | 'not-started'
-} {
-  if (run.status === 'uploading' || run.status === 'finalizing')
-    return { upload: run.status, transcription: 'waiting' }
-  if (run.status === 'cancelled')
-    return { upload: 'cancelled', transcription: 'not-started' }
-  return { upload: 'completed', transcription: run.status }
-}
-
-export type HistoryViewState = {
-  search: string
-  pageSize: number
-  page: number
-  sort: {
-    column: 'created' | 'size'
-    direction: 'ascending' | 'descending'
-  }
-}
-
-export const initialHistoryView: HistoryViewState = {
-  search: '',
-  pageSize: 10,
-  page: 1,
-  sort: { column: 'created', direction: 'descending' }
-}
-
-export function transcriptText(run: Run): string {
+function createSampleTranscript(run: Run): string {
   return sampleTranscript.map((segment) => {
     const timestamp = run.timestamps ? `[${segment.time}] ` : ''
     const speaker = run.labels ? `${run.speakers === 1 ? 'Speaker 1' : segment.speaker}: ` : ''

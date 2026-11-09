@@ -38,24 +38,22 @@ SSScribe/                            Repository root (actual checkout name may d
 |    |    |--- components/           UI components, one file per component
 |    |    |    |--- Brand.tsx        SSScribe logo
 |    |    |    |--- EmptyState.tsx   Empty/error state presentation
-|    |    |    |--- HistoryPage.tsx  History table, counts and preview controls
+|    |    |    |--- HistoryPage.tsx  History table, counts, search and pagination
 |    |    |    |--- Icon.tsx         Shared inline SVG icons
 |    |    |    |--- RunDetail.tsx    Run information and sample transcript
 |    |    |    |--- SignInForm.tsx   Sign-in form and session feedback
+|    |    |    |--- SortableHeader.tsx Shared sortable table heading
 |    |    |    |--- StatusBadge.tsx  Run status label
 |    |    |    |--- UploadPage.tsx   File picker, options and validation
-|    |    |--- preview.ts            Types, fixtures, sample text and transition helper
+|    |    |--- run.ts                Run contract, size limit, formatting and stage mapping
+|    |    |--- history.ts            History view preferences and defaults
+|    |    |--- preview.ts            Fixtures, sample text creation and simulation
 |    |    |--- api/auth.ts           Typed auth requests and session response validation
 |    |    |--- index.css             Global defaults and light/dark theme tokens
 |    |    |--- App.css               Layout, component styles and responsive rules
-|    |    |--- assets/               Static image and SVG assets
-|    |         |--- hero.png
-|    |         |--- react.svg
-|    |         |--- vite.svg
 |    |
 |    |--- public/                    Static assets served without module imports
 |         |--- favicon.svg           Favicon referenced by index.html
-|         |--- icons.svg             Starter icon sprite
 |
 |--- backend/                        Python/FastAPI application API and standalone mock
 |    |--- main.py                    FastAPI app, health, auth router and HTTP errors
@@ -97,12 +95,13 @@ SSScribe/                            Repository root (actual checkout name may d
 | `src/components/SignInForm.tsx` | Sign-in form, session-check message and auth feedback; receives state and callbacks from App. |
 | `src/components/HistoryPage.tsx` | History table, summary counts, upload/transcription statuses, action buttons, filename search, Submitted/Size sorting and 10/25/50-row pagination controls in the top toolbar; receives runs, persistent view state and action callbacks from App. |
 | `src/components/UploadPage.tsx` | File/options state, validation and new preview run submission. |
-| `src/components/RunDetail.tsx` | Transcript panel, recording metadata, separate upload/transcription statuses, saved settings, state-specific actions and identical plain-text display/Copy/Download through `transcriptText`; Download starts a standard browser download. |
+| `src/components/RunDetail.tsx` | Transcript panel, recording metadata, separate upload/transcription statuses, saved settings, state-specific actions and identical plain-text display/Copy/Download from `run.transcript`; Download starts a standard browser download. |
 | `src/components/Brand.tsx`, `Icon.tsx`, `StatusBadge.tsx`, `EmptyState.tsx` | Shared UI components. |
-| `src/assets/` | Static images and SVG files available for module imports. |
 | `src/api/auth.ts` | Typed sign-in/session/sign-out requests and response/error handling. Validates user response fields; the backend owns allowed identities. |
-| `src/config.ts` | Development footer version and temporary History example count. |
-| `src/preview.ts` | Run/status types, size limit, four base fixtures plus configurable temporary pagination examples, shared transcript, formatting, plain-text `transcriptText` formatting, shared `getRunStatuses` mapping and `advanceRuns`. |
+| `frontend/package.json` | Shared application version, dependencies and scripts. |
+| `src/run.ts` | Run types, size limit, date/size formatting and stage status mapping. |
+| `src/history.ts` | History view state and defaults. |
+| `src/preview.ts` | Four base fixtures plus configurable temporary pagination examples, sample transcript creation and `advanceRuns`. |
 | `src/index.css` | Theme tokens, global styles, focus/reduced-motion rules and control defaults. |
 | `src/App.css` | Shell, History, forms, details, sign-in, theme toggle and responsive component styles. |
 
@@ -158,11 +157,12 @@ All frontend paths in this table are relative to `frontend/` unless otherwise no
 | Theme preference or top-bar toggle behavior | `src/App.tsx`; icons in `src/components/Icon.tsx`, toggle layout in `src/App.css` |
 | Page spacing, typography or responsive layout | `src/App.css` and global rules in `src/index.css` |
 | File picker, speakers, language and option fields | `src/components/UploadPage.tsx` |
-| Upload size limit | `MAX_FILE_SIZE` in `src/preview.ts`; update guidance/error copy in `components/UploadPage.tsx` and documentation too |
+| Upload size limit | `MAX_FILE_SIZE` in `src/run.ts`; update guidance/error copy in `components/UploadPage.tsx` and documentation too |
 | Extension validation | `UploadPage.validate()` in `src/components/UploadPage.tsx`; picker `accept` is only a convenience. MP3/WAV and silent `.txt` acceptance share the same size checks |
 | History columns, summary counts or action buttons | `src/components/HistoryPage.tsx` |
-| Application version in the development footer | `src/config.ts` |
-| Sample runs, shared transcript, stage status mapping, date/size formatting | `src/preview.ts` |
+| Application version in the footer/sidebar | `frontend/package.json` |
+| Sample runs and transcript creation | `src/preview.ts` |
+| Stage status mapping and date/size formatting | `src/run.ts` |
 | Simulation stages versus timing | Transition helper in `src/preview.ts`; interval, retry and cancellation in `src/App.tsx` |
 | Transcript/details presentation | `src/components/RunDetail.tsx`; styles in `src/App.css` |
 | Local sign-in/out | Form in `src/components/SignInForm.tsx`; session/events in `src/App.tsx`; requests in `src/api/auth.ts` |

@@ -17,7 +17,7 @@ Build a working local mock of an authenticated speech-to-text application. Prior
 
 The UI preview is implemented for review. It restores an Austin/John backend session or opens the access-key sign-in form, with navy accents, light/dark themes, a persistent banner, Upload/History navigation, simulated runs and sample transcript details.
 
-- `frontend/src/preview.ts`: typed fixtures, sample text and transitions.
+- `frontend/src/preview.ts`: temporary fixtures, sample transcript creation and simulated transitions. `src/run.ts` owns the run contract and display helpers; `src/history.ts` owns History preferences. Transcript details render `run.transcript` verbatim for display, Copy and Download.
 - `App.tsx`: shell, navigation, theme, backend session/sign-in, preview state and timer. `components/SignInForm.tsx` renders sign-in; `components/HistoryPage.tsx` renders History. `src/api/auth.ts` owns typed auth calls.
 - `frontend/src/components/`: one file per UI component, including shared visuals, Upload and run details. Keep static images in `src/assets/`, request clients in `src/api/` and app coordination in `App.tsx`. Keep folders shallow and use idiomatic React/TypeScript. Keep teaching explanations in conversation; questions about traces do not by themselves authorize refactors. See `frontend/README.md#source-layout`.
 - Reload resets preview runs, form and navigation, then restores identity through `/api/auth/me`. Sign-out and each new sign-in reset preview runs. Theme persists under `ssscribe-theme` when localStorage is available.

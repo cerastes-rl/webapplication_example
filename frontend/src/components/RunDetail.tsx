@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { formatDate, formatSize, getRunStatuses, transcriptText } from '../preview'
-import type { Run } from '../preview'
+import { formatDate, formatSize, getRunStatuses } from '../run'
+import type { Run } from '../run'
 import { EmptyState } from './EmptyState'
 import { StatusBadge } from './StatusBadge'
 
@@ -15,10 +15,11 @@ export function RunDetail({
   onRetry: () => void
   onCancel: () => void
 }) {
+  const transcript = run.transcript ?? ''
   const [exportMessage, setExportMessage] = useState('')
   async function copyTranscript() {
     try {
-      await navigator.clipboard.writeText(transcriptText(run))
+      await navigator.clipboard.writeText(transcript)
       setExportMessage('Transcript copied.')
     } catch {
       setExportMessage('Could not copy the transcript. Try downloading it instead.')
@@ -26,7 +27,7 @@ export function RunDetail({
   }
   function downloadTranscript() {
     try {
-      const blob = new Blob([transcriptText(run)], { type: 'text/plain;charset=utf-8' })
+      const blob = new Blob([transcript], { type: 'text/plain;charset=utf-8' })
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
@@ -79,7 +80,7 @@ export function RunDetail({
             )}
           </div>
           {run.status === 'completed' ? (
-            <pre className="transcript">{transcriptText(run)}</pre>
+            <pre className="transcript">{transcript}</pre>
           ) : (
             <EmptyState title={stateTitle}>
               {stateDescription}

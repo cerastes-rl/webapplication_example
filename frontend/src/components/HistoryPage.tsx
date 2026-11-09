@@ -1,9 +1,11 @@
 import { useRef } from 'react'
+import { SortableHeader } from './SortableHeader'
 import { EmptyState } from './EmptyState'
 import { Icon } from './Icon'
 import { StatusBadge } from './StatusBadge'
-import { formatDate, formatSize, getRunStatuses } from '../preview'
-import type { Run, HistoryViewState } from '../preview'
+import { formatDate, formatSize, getRunStatuses } from '../run'
+import type { Run } from '../run'
+import type { HistoryViewState } from '../history'
 
 type HistoryPageProps = {
   runs: Run[]
@@ -52,6 +54,7 @@ export function HistoryPage({
   const start = (currentPage - 1) * pageSize
   const visibleRuns = sortedRuns.slice(start, start + pageSize)
   const completed = runs.filter((run) => run.status === 'completed').length
+  const inProgress = runs.filter((run) => ['uploading', 'finalizing', 'queued', 'processing'].includes(run.status)).length
 
   return (
     <>
@@ -81,47 +84,38 @@ export function HistoryPage({
         </div>
         <div className="stat-card">
           <span>In progress</span>
-          <strong>
-            {runs
-              .filter((run) =>
-                ['uploading', 'finalizing', 'queued', 'processing'].includes(
-                  run.status
-                )
-              )
-              .length.toString()
-              .padStart(2, '0')}
-          </strong>
+          <strong>{inProgress.toString().padStart(2, '0')}</strong>
         </div>
       </div>
       <section className="panel history-panel" aria-label="Recording history">
         <div className="table-toolbar">
           <div className="table-heading-controls">
-          <div className="history-search">
-            <input
-              ref={searchInput}
-              aria-label="Search filenames"
-              type="search"
-              placeholder="Search filenames"
-              value={search}
-              onChange={(event) => {
-                onViewChange({ ...view, search: event.target.value, page: 1 })
-              }}
-            />
-            {search && (
-              <button
-                type="button"
-                className="clear-search"
-                aria-label="Clear search"
-                title="Clear search"
-                onClick={() => {
-                  onViewChange({ ...view, search: '', page: 1 })
-                  searchInput.current?.focus()
+            <div className="history-search">
+              <input
+                ref={searchInput}
+                aria-label="Search filenames"
+                type="search"
+                placeholder="Search filenames"
+                value={search}
+                onChange={(event) => {
+                  onViewChange({ ...view, search: event.target.value, page: 1 })
                 }}
-              >
-                <Icon name="circle-arrow" size={18} />
-              </button>
-            )}
-          </div>
+              />
+              {search && (
+                <button
+                  type="button"
+                  className="clear-search"
+                  aria-label="Clear search"
+                  title="Clear search"
+                  onClick={() => {
+                    onViewChange({ ...view, search: '', page: 1 })
+                    searchInput.current?.focus()
+                  }}
+                >
+                  <Icon name="circle-arrow" size={18} />
+                </button>
+              )}
+            </div>
             <div>
               <h2>
                 {query ? 'Filtered recordings' : 'All recordings'} <span>{matchingRuns.length}</span>
@@ -129,41 +123,41 @@ export function HistoryPage({
               <p>Open a run for its settings and transcript.</p>
             </div>
           </div>
-        <div className="table-pagination">
-          <label className="page-size-control">
-            Recordings per page
-            <select
-              value={pageSize}
-              onChange={(event) => {
-                onViewChange({ ...view, pageSize: Number(event.target.value), page: 1 })
-              }}
-            >
-              <option value={10}>10</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-            </select>
-          </label>
-          <span role="status">
-            {matchingRuns.length === 0 ? 0 : start + 1}–{Math.min(start + pageSize, matchingRuns.length)} of {matchingRuns.length}
-          </span>
-          <nav className="pagination-controls" aria-label="Recording history pages">
-            <button
-              className="button secondary history-action"
-              disabled={currentPage === 1}
-              onClick={() => onViewChange({ ...view, page: currentPage - 1 })}
-            >
-              Previous
-            </button>
-            <span>Page {currentPage} of {pageCount}</span>
-            <button
-              className="button secondary history-action"
-              disabled={currentPage === pageCount}
-              onClick={() => onViewChange({ ...view, page: currentPage + 1 })}
-            >
-              Next
-            </button>
-          </nav>
-        </div>
+          <div className="table-pagination">
+            <label className="page-size-control">
+              Recordings per page
+              <select
+                value={pageSize}
+                onChange={(event) => {
+                  onViewChange({ ...view, pageSize: Number(event.target.value), page: 1 })
+                }}
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+              </select>
+            </label>
+            <span role="status">
+              {matchingRuns.length === 0 ? 0 : start + 1}–{Math.min(start + pageSize, matchingRuns.length)} of {matchingRuns.length}
+            </span>
+            <nav className="pagination-controls" aria-label="Recording history pages">
+              <button
+                className="button secondary history-action"
+                disabled={currentPage === 1}
+                onClick={() => onViewChange({ ...view, page: currentPage - 1 })}
+              >
+                Previous
+              </button>
+              <span>Page {currentPage} of {pageCount}</span>
+              <button
+                className="button secondary history-action"
+                disabled={currentPage === pageCount}
+                onClick={() => onViewChange({ ...view, page: currentPage + 1 })}
+              >
+                Next
+              </button>
+            </nav>
+          </div>
         </div>
         {runs.length === 0 ? (
           <EmptyState
@@ -195,18 +189,8 @@ export function HistoryPage({
               <thead>
                 <tr>
                   <th scope="col">Recording / Run ID</th>
-                  <th scope="col" aria-sort={sort.column === 'created' ? sort.direction : 'none'}>
-                    <button className="sort-button" onClick={() => changeSort('created')}>
-                      Submitted
-                      <span aria-hidden="true"><Icon name={sort.column === 'created' ? sort.direction === 'ascending' ? 'arrow-up' : 'arrow-down' : 'sort'} size={14} /></span>
-                    </button>
-                  </th>
-                  <th scope="col" aria-sort={sort.column === 'size' ? sort.direction : 'none'}>
-                    <button className="sort-button" onClick={() => changeSort('size')}>
-                      Size
-                      <span aria-hidden="true"><Icon name={sort.column === 'size' ? sort.direction === 'ascending' ? 'arrow-up' : 'arrow-down' : 'sort'} size={14} /></span>
-                    </button>
-                  </th>
+                  <SortableHeader label="Submitted" direction={sort.column === 'created' ? sort.direction : 'none'} onSort={() => changeSort('created')} />
+                  <SortableHeader label="Size" direction={sort.column === 'size' ? sort.direction : 'none'} onSort={() => changeSort('size')} />
                   <th scope="col">Speakers</th>
                   <th scope="col">Settings</th>
                   <th scope="col">Upload status</th>

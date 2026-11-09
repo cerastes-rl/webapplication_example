@@ -1,4 +1,4 @@
-import { APP_VERSION } from './config'
+import { version as APP_VERSION } from '../package.json'
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { getCurrentUser, signIn, signOut as endSession } from './api/auth'
@@ -8,8 +8,9 @@ import { EmptyState } from './components/EmptyState'
 import { Icon } from './components/Icon'
 import { RunDetail } from './components/RunDetail'
 import { UploadPage } from './components/UploadPage'
-import { advanceRuns, initialRuns, initialHistoryView } from './preview'
-import type { Run } from './preview'
+import { advanceRuns, initialRuns } from './preview'
+import type { Run } from './run'
+import { initialHistoryView } from './history'
 import { HistoryPage } from './components/HistoryPage'
 import { SignInForm } from './components/SignInForm'
 import './App.css'
@@ -91,6 +92,15 @@ function App() {
     setPage(next)
     setNotice('')
   }
+  function resetWorkspace() {
+    setRuns(initialRuns)
+    setHistoryView(initialHistoryView)
+    setSelected(null)
+    setPage('upload')
+    setNotice('')
+    setAccessKey('')
+    setAuthError('')
+  }
   async function submitSignIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (authBusy) return
@@ -98,12 +108,7 @@ function App() {
     setAuthError('')
     try {
       const current = await signIn(accessKey)
-      setRuns(initialRuns)
-      setHistoryView(initialHistoryView)
-      setSelected(null)
-      setPage('upload')
-      setNotice('')
-      setAccessKey('')
+      resetWorkspace()
       setUser(current)
     } catch (error) {
       setAuthError(
@@ -133,13 +138,7 @@ function App() {
     try {
       await endSession()
       setUser(null)
-      setRuns(initialRuns)
-      setHistoryView(initialHistoryView)
-      setSelected(null)
-      setNotice('')
-      setPage('upload')
-      setAuthError('')
-      setAccessKey('')
+      resetWorkspace()
     } catch (error) {
       setNotice(
         error instanceof Error
@@ -256,7 +255,7 @@ function App() {
             <div className="sidebar-bottom">
               <span className="local-dot" /> Built for local exploration
               <p>Your files stay on your device in this UI preview.</p>
-              <span className="version">SSScribe / PREVIEW 01</span>
+              <span className="version">SSScribe / {APP_VERSION}</span>
             </div>
           </aside>
           <main className="main-content" id="main" ref={main} tabIndex={-1}>

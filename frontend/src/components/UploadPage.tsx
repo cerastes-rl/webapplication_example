@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { formatSize, MAX_FILE_SIZE } from '../preview'
-import type { Run } from '../preview'
+import { formatSize, MAX_FILE_SIZE } from '../run'
+import type { Run } from '../run'
 import { Icon } from './Icon'
 
 export function UploadPage({ onBegin }: { onBegin: (run: Run) => void }) {
@@ -95,9 +95,7 @@ export function UploadPage({ onBegin }: { onBegin: (run: Run) => void }) {
           <section className="panel form-panel">
             <div className="section-heading">
               <span className="step-number">2</span>
-              <div>
-                <h2>Transcription settings</h2>
-              </div>
+              <h2>Transcription settings</h2>
             </div>
             <div className="form-grid">
               <label className="field">
@@ -123,9 +121,7 @@ export function UploadPage({ onBegin }: { onBegin: (run: Run) => void }) {
             </div>
             <div className="option-list">
               <label className="checkbox-row">
-                <span>
-                  <strong>Speaker labels</strong>
-                </span>
+                <span>Speaker labels</span>
                 <input
                   type="checkbox"
                   checked={labels}
@@ -133,9 +129,7 @@ export function UploadPage({ onBegin }: { onBegin: (run: Run) => void }) {
                 />
               </label>
               <label className="checkbox-row">
-                <span>
-                  <strong>Timestamps</strong>
-                </span>
+                <span>Timestamps</span>
                 <input
                   type="checkbox"
                   checked={timestamps}
