@@ -93,15 +93,16 @@ SSScribe/                            Repository root (actual checkout name may d
 | File | Responsibility |
 |---|---|
 | `src/main.tsx` | Imports global styles and mounts `App` in React StrictMode. |
-| `src/App.tsx` | Shell, navigation, theme, session restore/sign-in/sign-out, shared preview state/actions and lifecycle timer. |
+| `src/App.tsx` | Shell, navigation, theme, session restore/sign-in/sign-out, shared preview state/actions, History view state across internal navigation and lifecycle timer. |
 | `src/components/SignInForm.tsx` | Sign-in form, session-check message and auth feedback; receives state and callbacks from App. |
-| `src/components/HistoryPage.tsx` | History table, summary counts and preview-state controls; receives runs and action callbacks from App. |
+| `src/components/HistoryPage.tsx` | History table, summary counts, upload/transcription statuses, action buttons, filename search, Submitted/Size sorting and 10/25/50-row pagination controls in the top toolbar; receives runs, persistent view state and action callbacks from App. |
 | `src/components/UploadPage.tsx` | File/options state, validation and new preview run submission. |
-| `src/components/RunDetail.tsx` | Run settings, status, actions and sample transcript. |
+| `src/components/RunDetail.tsx` | Transcript panel, recording metadata, separate upload/transcription statuses, saved settings, state-specific actions and identical plain-text display/Copy/Download through `transcriptText`; Download starts a standard browser download. |
 | `src/components/Brand.tsx`, `Icon.tsx`, `StatusBadge.tsx`, `EmptyState.tsx` | Shared UI components. |
 | `src/assets/` | Static images and SVG files available for module imports. |
 | `src/api/auth.ts` | Typed sign-in/session/sign-out requests and response/error handling. Validates user response fields; the backend owns allowed identities. |
-| `src/preview.ts` | Run/status types, size limit, four fixtures, shared transcript, formatting and `advanceRuns`. |
+| `src/config.ts` | Development footer version and temporary History example count. |
+| `src/preview.ts` | Run/status types, size limit, four base fixtures plus configurable temporary pagination examples, shared transcript, formatting, plain-text `transcriptText` formatting, shared `getRunStatuses` mapping and `advanceRuns`. |
 | `src/index.css` | Theme tokens, global styles, focus/reduced-motion rules and control defaults. |
 | `src/App.css` | Shell, History, forms, details, sign-in, theme toggle and responsive component styles. |
 
@@ -158,9 +159,10 @@ All frontend paths in this table are relative to `frontend/` unless otherwise no
 | Page spacing, typography or responsive layout | `src/App.css` and global rules in `src/index.css` |
 | File picker, speakers, language and option fields | `src/components/UploadPage.tsx` |
 | Upload size limit | `MAX_FILE_SIZE` in `src/preview.ts`; update guidance/error copy in `components/UploadPage.tsx` and documentation too |
-| Extension validation | `UploadPage.validate()` in `src/components/UploadPage.tsx`; picker `accept` is only a convenience |
-| History columns, summary counts or preview-state selector | `src/components/HistoryPage.tsx` |
-| Sample runs, shared transcript, date/size formatting | `src/preview.ts` |
+| Extension validation | `UploadPage.validate()` in `src/components/UploadPage.tsx`; picker `accept` is only a convenience. MP3/WAV and silent `.txt` acceptance share the same size checks |
+| History columns, summary counts or action buttons | `src/components/HistoryPage.tsx` |
+| Application version in the development footer | `src/config.ts` |
+| Sample runs, shared transcript, stage status mapping, date/size formatting | `src/preview.ts` |
 | Simulation stages versus timing | Transition helper in `src/preview.ts`; interval, retry and cancellation in `src/App.tsx` |
 | Transcript/details presentation | `src/components/RunDetail.tsx`; styles in `src/App.css` |
 | Local sign-in/out | Form in `src/components/SignInForm.tsx`; session/events in `src/App.tsx`; requests in `src/api/auth.ts` |
@@ -195,7 +197,7 @@ Root `.gitignore` and `frontend/.gitignore` define exclusions. Only `example*` f
 
 ## Planned connected structure
 
-The [local architecture status table](LOCAL_IMPLEMENTATION_PLAN.md#1-small-local-architecture) tracks implemented components. Auth and its typed frontend client are complete; the user approved the auth interaction review on 2026-11-09. Future modules cover recording routes/client, SQLAlchemy models, upload/storage adapters, a Speech client and lifespan-managed SQL polling loops. Separate storage and Speech HTTP mocks own audio and simulated service jobs/results. Main FastAPI owns application SQL and business logic.
+The [local architecture status table](LOCAL_IMPLEMENTATION_PLAN.md#1-small-local-architecture) tracks implemented components. Auth and its typed frontend client are complete; the user approved the auth interaction review and current UI on 2026-11-09. Responsive layout review is deferred; connected workflow integration and validation remain planned. Future modules cover recording routes/client, SQLAlchemy models, upload/storage adapters, a Speech client and lifespan-managed SQL polling loops. Separate storage and Speech HTTP mocks own audio and simulated service jobs/results. Main FastAPI owns application SQL and business logic.
 
 The current database is `backend/data/databases/app.db`, initialized by `backend/database.py` manually or through the VS Code folder-open task from `backend/schema.sql`. It contains the accepted single `runs` table with sequential IDs, ownership, file metadata, options, application and Speech statuses, transcript, error and UTC timestamps. Application updates must set `updated_at`. Initialization preserves existing rows and does not perform schema migrations. API/worker/UI integration is pending; the older multi-table and scheduling-field proposals are future planning references. `backend/data/uploads/` remains proposed. Local data and database sidecars are already ignored. See the [local implementation plan](LOCAL_IMPLEMENTATION_PLAN.md) for candidate modules, contracts and delivery order, and the [architecture plan](IMPLEMENTATION_PLAN.md) for the Azure end state.
 

@@ -25,7 +25,7 @@ The UI preview is implemented for review. It restores an Austin/John backend ses
 - The picker accepts non-empty MP3/WAV up to **4,000,000,000 bytes inclusive**, checking extension and size. Requested speakers are Automatic or 1–10, language English, speaker labels/timestamps default on.
 - Main FastAPI exposes health plus `/api/auth/sign-in`, `/api/auth/me` and `/api/auth/sign-out`. Access keys and stable IDs are exactly `austin` and `john`; sessions are in memory with an HttpOnly cookie. Restart requires sign-in. `backend/auth.py` exposes `get_current_user` for future SQL ownership checks.
 
-Browser/accessibility review, focused interaction tests and UI approval are the current acceptance tasks. **Local Austin/John auth is complete; the user approved its interaction review on 2026-11-09. Broader UI acceptance remains pending. Obtain explicit UI approval before further connected History/upload integration.**
+**Current UI is complete for this scope; the user explicitly approved it on 2026-11-09. Local Austin/John auth and its interaction review are also complete. Responsive layout review is deferred; browser/accessibility checks and focused interaction tests remain follow-up validation. The UI approval gate is satisfied; connected History/upload integration remains planned and requires its own implementation request.**
 
 ## Planned connected architecture
 

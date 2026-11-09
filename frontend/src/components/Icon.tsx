@@ -7,6 +7,10 @@ export function Icon({
     | 'history'
     | 'audio'
     | 'arrow'
+    | 'sort'
+    | 'circle-arrow'
+    | 'arrow-up'
+    | 'arrow-down'
     | 'logout'
     | 'check'
     | 'sun'
@@ -32,6 +36,15 @@ export function Icon({
         <path d="M14 3v5h5M9 13v3m3-5v7m3-5v3" />
       </>
     ),
+    'circle-arrow': (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M8 12h8m-4-4 4 4-4 4" />
+      </>
+    ),
+    sort: <path d="M8 19V5m-4 4 4-4 4 4m4-4v14m-4-4 4 4 4-4" />,
+    'arrow-up': <path d="M12 19V5m-6 6 6-6 6 6" />,
+    'arrow-down': <path d="M12 5v14m-6-6 6 6 6-6" />,
     arrow: <path d="m9 5 7 7-7 7" />,
     logout: (
       <>

@@ -16,12 +16,12 @@ export function UploadPage({ onBegin }: { onBegin: (run: Run) => void }) {
       setError('')
       return
     }
-    if (!/\.(mp3|wav)$/i.test(next.name))
+    if (!/\.(mp3|wav|txt)$/i.test(next.name))
       setError('Choose an MP3 or WAV audio file.')
     else if (next.size === 0)
       setError('This file is empty. Please choose another recording.')
     else if (next.size > MAX_FILE_SIZE)
-      setError('This file exceeds the 4 GB limit (4,000,000,000 bytes).')
+      setError('This file exceeds the 1 GB limit.')
     else setError('')
   }
   function submit(event: FormEvent) {
@@ -49,9 +49,7 @@ export function UploadPage({ onBegin }: { onBegin: (run: Run) => void }) {
     <>
       <div className="page-heading">
         <div>
-          <span className="eyebrow">YOUR WORKSPACE</span>
           <h1>Upload a recording</h1>
-          <p>From spoken words to something you can work with.</p>
         </div>
       </div>
       <div className="upload-layout">
@@ -68,7 +66,7 @@ export function UploadPage({ onBegin }: { onBegin: (run: Run) => void }) {
               <span className="upload-symbol">
                 <Icon name="upload" size={30} />
               </span>
-              <h3>{file ? file.name : 'Your next transcript starts here'}</h3>
+              <h3>{file ? file.name : 'Select a recording'}</h3>
               <p>
                 {file
                   ? formatSize(file.size)
@@ -78,7 +76,7 @@ export function UploadPage({ onBegin }: { onBegin: (run: Run) => void }) {
                 {file ? 'Change file' : 'Choose file'}
                 <input
                   type="file"
-                  accept=".mp3,.wav,audio/mpeg,audio/wav,audio/x-wav"
+                  accept=".mp3,.wav,.txt,audio/mpeg,audio/wav,audio/x-wav,text/plain"
                   aria-label="Choose audio file"
                   aria-describedby="file-guidance file-error"
                   onChange={(event) =>
@@ -87,7 +85,7 @@ export function UploadPage({ onBegin }: { onBegin: (run: Run) => void }) {
                 />
               </label>
               <small id="file-guidance">
-                MP3 or WAV · Up to 4 GB (4,000,000,000 bytes)
+                MP3 or WAV · Up to 1 GB
               </small>
             </div>
             <p id="file-error" className="field-error" role="alert">
@@ -98,8 +96,7 @@ export function UploadPage({ onBegin }: { onBegin: (run: Run) => void }) {
             <div className="section-heading">
               <span className="step-number">2</span>
               <div>
-                <h2>Make it yours</h2>
-                <p>Set your transcription preferences.</p>
+                <h2>Transcription settings</h2>
               </div>
             </div>
             <div className="form-grid">
@@ -116,21 +113,18 @@ export function UploadPage({ onBegin }: { onBegin: (run: Run) => void }) {
                     </option>
                   ))}
                 </select>
-                <small>Requested count, not detected speakers.</small>
               </label>
               <label className="field">
                 Recording language
                 <select defaultValue="English">
                   <option>English</option>
                 </select>
-                <small>More languages can be added later.</small>
               </label>
             </div>
             <div className="option-list">
               <label className="checkbox-row">
                 <span>
                   <strong>Speaker labels</strong>
-                  <small>Separate the conversation by speaker.</small>
                 </span>
                 <input
                   type="checkbox"
@@ -141,7 +135,6 @@ export function UploadPage({ onBegin }: { onBegin: (run: Run) => void }) {
               <label className="checkbox-row">
                 <span>
                   <strong>Timestamps</strong>
-                  <small>Add time markers to the transcript.</small>
                 </span>
                 <input
                   type="checkbox"
@@ -153,41 +146,31 @@ export function UploadPage({ onBegin }: { onBegin: (run: Run) => void }) {
           </section>
           <div className="submit-row">
             <p>Preview only. No file bytes are uploaded or saved.</p>
-            <button className="button primary" type="submit">
-              <Icon name="upload" size={17} />
-              Begin upload
-            </button>
+            <div className="submit-action">
+              <span className="step-number">3</span>
+              <button className="button primary" type="submit">
+                <Icon name="upload" size={17} />
+                Begin upload
+              </button>
+            </div>
           </div>
         </form>
         <aside className="upload-aside">
-          <span className="eyebrow">A LITTLE CLARITY</span>
-          <h2>
-            Less listening back.
-            <br />
-            More moving forward.
-          </h2>
-          <p>Your recordings and their progress live together in History.</p>
+          <h2>Instructions</h2>
           <ol>
             <li>
-              <strong>Choose a recording</strong>
-              <span>Add your audio and preferences.</span>
+              <strong>Choose your audio</strong>
+              <span>Select a recording from your device.</span>
             </li>
             <li>
-              <strong>Follow its progress</strong>
-              <span>Move between pages while the preview runs.</span>
+              <strong>Transcription settings</strong>
+              <span>Choose the speaker count, language, speaker labels and timestamps.</span>
             </li>
             <li>
-              <strong>Read your transcript</strong>
-              <span>Open a completed run to explore sample text.</span>
+              <strong>Begin upload</strong>
+              <span>Select Begin upload to submit your recording.</span>
             </li>
           </ol>
-          <div className="aside-note">
-            <strong>This is a UI preview</strong>
-            <p>
-              Progress and transcripts are simulated. Settings are kept for this
-              session only. Reloading resets the demo.
-            </p>
-          </div>
         </aside>
       </div>
     </>

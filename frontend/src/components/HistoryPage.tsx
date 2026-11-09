@@ -1,15 +1,14 @@
+import { useRef } from 'react'
 import { EmptyState } from './EmptyState'
 import { Icon } from './Icon'
 import { StatusBadge } from './StatusBadge'
-import { formatDate, formatSize } from '../preview'
-import type { Run } from '../preview'
+import { formatDate, formatSize, getRunStatuses } from '../preview'
+import type { Run, HistoryViewState } from '../preview'
 
 type HistoryPageProps = {
   runs: Run[]
-  scenario: string
-  loading: boolean
-  onScenarioChange: (value: string) => void
-  onRefresh: () => void
+  view: HistoryViewState
+  onViewChange: (view: HistoryViewState) => void
   onUpload: () => void
   onOpen: (id: string) => void
   onRetry: (id: string) => void
@@ -18,27 +17,48 @@ type HistoryPageProps = {
 
 export function HistoryPage({
   runs,
-  scenario,
-  loading,
-  onScenarioChange,
-  onRefresh,
+  view,
+  onViewChange,
   onUpload,
   onOpen,
   onRetry,
   onCancel
 }: HistoryPageProps) {
-  const shownRuns = scenario === 'empty' ? [] : runs
+  const searchInput = useRef<HTMLInputElement>(null)
+  const { search, pageSize, page, sort } = view
+  function changeSort(column: 'created' | 'size') {
+    onViewChange({
+      ...view,
+      page: 1,
+      sort: {
+        column,
+        direction: sort.column === column && sort.direction === 'descending'
+          ? 'ascending'
+          : 'descending'
+      }
+    })
+  }
+  const query = search.trim().toLowerCase()
+  const matchingRuns = runs.filter((run) => run.filename.toLowerCase().includes(query))
+  const sortedRuns = [...matchingRuns].sort((a, b) => {
+    const difference = sort.column === 'created'
+      ? Date.parse(a.created) - Date.parse(b.created)
+      : a.size - b.size
+    return (sort.direction === 'ascending' ? difference : -difference)
+      || a.id.localeCompare(b.id)
+  })
+  const pageCount = Math.max(1, Math.ceil(matchingRuns.length / pageSize))
+  const currentPage = Math.min(page, pageCount)
+  const start = (currentPage - 1) * pageSize
+  const visibleRuns = sortedRuns.slice(start, start + pageSize)
   const completed = runs.filter((run) => run.status === 'completed').length
 
   return (
     <>
       <div className="page-heading">
         <div>
-          <span className="eyebrow">YOUR WORKSPACE</span>
-          <h1>
-            Recording history<span className="heading-dot">.</span>
-          </h1>
-          <p>Every conversation, all in one place.</p>
+          <h1>Recording history</h1>
+          <p>Track recording uploads, transcription progress and completed transcripts.</p>
         </div>
         <button className="button primary" onClick={onUpload}>
           <Icon name="upload" size={17} />
@@ -49,7 +69,6 @@ export function HistoryPage({
         <div className="stat-card">
           <span>Total recordings</span>
           <strong>{runs.length.toString().padStart(2, '0')}</strong>
-          <small>Your workspace, at a glance</small>
         </div>
         <div className="stat-card">
           <span>Ready to read</span>
@@ -59,7 +78,6 @@ export function HistoryPage({
               <Icon name="check" size={18} />
             </span>
           </strong>
-          <small>Completed sample transcripts</small>
         </div>
         <div className="stat-card">
           <span>In progress</span>
@@ -73,62 +91,81 @@ export function HistoryPage({
               .length.toString()
               .padStart(2, '0')}
           </strong>
-          <small>Uploads and processing runs</small>
         </div>
       </div>
       <section className="panel history-panel" aria-label="Recording history">
         <div className="table-toolbar">
-          <div>
-            <h2>
-              All recordings <span>{shownRuns.length}</span>
-            </h2>
-            <p>Open a run for its settings and transcript.</p>
-          </div>
-          <div className="toolbar-controls">
-            <label className="scenario-control">
-              Preview state
-              <select
-                value={scenario}
-                onChange={(event) => onScenarioChange(event.target.value)}
-              >
-                <option value="normal">Example recordings</option>
-                <option value="empty">Empty history</option>
-                <option value="error">Connection error</option>
-              </select>
-            </label>
-            <button
-              className="refresh-button"
-              aria-label="Preview loading state"
-              onClick={onRefresh}
-            >
-              <Icon name="history" size={18} />
-            </button>
-          </div>
-        </div>
-        {loading ? (
-          <div className="empty-state" role="status">
-            <span className="loading-ring" />
-            <h2>Loading recordings…</h2>
-            <p>Simulated loading state.</p>
-          </div>
-        ) : scenario === 'error' ? (
-          <EmptyState
-            title="Couldn’t load your recordings"
-            action={
+          <div className="table-heading-controls">
+          <div className="history-search">
+            <input
+              ref={searchInput}
+              aria-label="Search filenames"
+              type="search"
+              placeholder="Search filenames"
+              value={search}
+              onChange={(event) => {
+                onViewChange({ ...view, search: event.target.value, page: 1 })
+              }}
+            />
+            {search && (
               <button
-                className="button secondary"
+                type="button"
+                className="clear-search"
+                aria-label="Clear search"
+                title="Clear search"
                 onClick={() => {
-                  onScenarioChange('normal')
-                  onRefresh()
+                  onViewChange({ ...view, search: '', page: 1 })
+                  searchInput.current?.focus()
                 }}
               >
-                Try again
+                <Icon name="circle-arrow" size={18} />
               </button>
-            }
-          >
-            This is a preview of a connection error, not a real API request.
-          </EmptyState>
-        ) : shownRuns.length === 0 ? (
+            )}
+          </div>
+            <div>
+              <h2>
+                {query ? 'Filtered recordings' : 'All recordings'} <span>{matchingRuns.length}</span>
+              </h2>
+              <p>Open a run for its settings and transcript.</p>
+            </div>
+          </div>
+        <div className="table-pagination">
+          <label className="page-size-control">
+            Recordings per page
+            <select
+              value={pageSize}
+              onChange={(event) => {
+                onViewChange({ ...view, pageSize: Number(event.target.value), page: 1 })
+              }}
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+            </select>
+          </label>
+          <span role="status">
+            {matchingRuns.length === 0 ? 0 : start + 1}–{Math.min(start + pageSize, matchingRuns.length)} of {matchingRuns.length}
+          </span>
+          <nav className="pagination-controls" aria-label="Recording history pages">
+            <button
+              className="button secondary history-action"
+              disabled={currentPage === 1}
+              onClick={() => onViewChange({ ...view, page: currentPage - 1 })}
+            >
+              Previous
+            </button>
+            <span>Page {currentPage} of {pageCount}</span>
+            <button
+              className="button secondary history-action"
+              disabled={currentPage === pageCount}
+              onClick={() => onViewChange({ ...view, page: currentPage + 1 })}
+            >
+              Next
+            </button>
+          </nav>
+        </div>
+        </div>
+        {runs.length === 0 ? (
           <EmptyState
             title="A fresh start for your recordings"
             action={
@@ -139,22 +176,46 @@ export function HistoryPage({
           >
             Your uploads and transcripts will appear here.
           </EmptyState>
+        ) : matchingRuns.length === 0 ? (
+          <EmptyState
+            title="No matching recordings"
+            action={
+              <button className="button secondary" onClick={() => {
+                onViewChange({ ...view, search: '', page: 1 })
+              }}>
+                Clear search
+              </button>
+            }
+          >
+            Try another filename or clear the search.
+          </EmptyState>
         ) : (
           <div className="table-scroll">
             <table>
               <thead>
                 <tr>
                   <th scope="col">Recording / Run ID</th>
-                  <th scope="col">Submitted</th>
-                  <th scope="col">Size</th>
+                  <th scope="col" aria-sort={sort.column === 'created' ? sort.direction : 'none'}>
+                    <button className="sort-button" onClick={() => changeSort('created')}>
+                      Submitted
+                      <span aria-hidden="true"><Icon name={sort.column === 'created' ? sort.direction === 'ascending' ? 'arrow-up' : 'arrow-down' : 'sort'} size={14} /></span>
+                    </button>
+                  </th>
+                  <th scope="col" aria-sort={sort.column === 'size' ? sort.direction : 'none'}>
+                    <button className="sort-button" onClick={() => changeSort('size')}>
+                      Size
+                      <span aria-hidden="true"><Icon name={sort.column === 'size' ? sort.direction === 'ascending' ? 'arrow-up' : 'arrow-down' : 'sort'} size={14} /></span>
+                    </button>
+                  </th>
                   <th scope="col">Speakers</th>
                   <th scope="col">Settings</th>
-                  <th scope="col">Status</th>
+                  <th scope="col">Upload status</th>
+                  <th scope="col">Transcription status</th>
                   <th scope="col">Action</th>
                 </tr>
               </thead>
               <tbody>
-                {shownRuns.map((run) => (
+                {visibleRuns.map((run) => (
                   <tr key={run.id}>
                     <td>
                       <div className="recording-cell">
@@ -185,7 +246,7 @@ export function HistoryPage({
                       </div>
                     </td>
                     <td>
-                      <StatusBadge status={run.status} />
+                      <StatusBadge status={getRunStatuses(run).upload} />
                       {run.status === 'uploading' && (
                         <div className="row-progress">
                           <progress
@@ -198,27 +259,31 @@ export function HistoryPage({
                       )}
                     </td>
                     <td>
+                      <StatusBadge status={getRunStatuses(run).transcription} />
+                    </td>
+                    <td>
                       {run.status === 'failed' ? (
                         <button
-                          className="text-button"
+                          className="button secondary history-action"
                           onClick={() => onRetry(run.id)}
                         >
                           Retry
                         </button>
                       ) : run.status === 'uploading' ? (
                         <button
-                          className="text-button"
+                          className="button secondary history-action"
                           onClick={() => onCancel(run.id)}
                         >
                           Cancel
                         </button>
                       ) : (
                         <button
-                          className="open-button"
-                          aria-label={`Open ${run.filename}`}
+                          className="button secondary history-action"
+                          aria-label={`View transcript for ${run.filename}`}
+                          disabled={run.status !== 'completed'}
                           onClick={() => onOpen(run.id)}
                         >
-                          <Icon name="arrow" size={17} />
+                          View transcript
                         </button>
                       )}
                     </td>
@@ -228,18 +293,7 @@ export function HistoryPage({
             </table>
           </div>
         )}
-        <div className="table-footer">
-          <span>Shared sample recordings · This session only</span>
-          <span>SQL history filtering is planned.</span>
-        </div>
       </section>
-      <div className="history-footnote">
-        <Icon name="audio" size={16} />
-        <p>
-          Good conversations deserve a second look. Select a completed recording
-          to read its sample transcript.
-        </p>
-      </div>
     </>
   )
 }

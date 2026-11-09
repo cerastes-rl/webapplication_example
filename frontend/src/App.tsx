@@ -1,3 +1,4 @@
+import { APP_VERSION } from './config'
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { getCurrentUser, signIn, signOut as endSession } from './api/auth'
@@ -7,7 +8,7 @@ import { EmptyState } from './components/EmptyState'
 import { Icon } from './components/Icon'
 import { RunDetail } from './components/RunDetail'
 import { UploadPage } from './components/UploadPage'
-import { advanceRuns, initialRuns } from './preview'
+import { advanceRuns, initialRuns, initialHistoryView } from './preview'
 import type { Run } from './preview'
 import { HistoryPage } from './components/HistoryPage'
 import { SignInForm } from './components/SignInForm'
@@ -58,11 +59,10 @@ function App() {
     return () => controller.abort()
   }, [])
   const [page, setPage] = useState<Page>('upload')
+  const [historyView, setHistoryView] = useState(initialHistoryView)
   const [runs, setRuns] = useState<Run[]>(initialRuns)
   const [selected, setSelected] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
-  const [scenario, setScenario] = useState('normal')
-  const [loading, setLoading] = useState(false)
   const main = useRef<HTMLElement>(null)
   const hasActive = runs.some((run) =>
     ['uploading', 'finalizing', 'queued', 'processing'].includes(run.status)
@@ -75,11 +75,6 @@ function App() {
   useEffect(() => {
     main.current?.focus()
   }, [page, signedIn, authLoading])
-  useEffect(() => {
-    if (!loading) return
-    const timer = window.setTimeout(() => setLoading(false), 1500)
-    return () => window.clearTimeout(timer)
-  }, [loading])
   const uploading = runs.some(
     (run) => run.status === 'uploading' || run.status === 'finalizing'
   )
@@ -104,9 +99,8 @@ function App() {
     try {
       const current = await signIn(accessKey)
       setRuns(initialRuns)
+      setHistoryView(initialHistoryView)
       setSelected(null)
-      setScenario('normal')
-      setLoading(false)
       setPage('upload')
       setNotice('')
       setAccessKey('')
@@ -140,11 +134,10 @@ function App() {
       await endSession()
       setUser(null)
       setRuns(initialRuns)
+      setHistoryView(initialHistoryView)
       setSelected(null)
       setNotice('')
       setPage('upload')
-      setScenario('normal')
-      setLoading(false)
       setAuthError('')
       setAccessKey('')
     } catch (error) {
@@ -173,9 +166,12 @@ function App() {
     setNotice('Processing retry queued. This is a simulation.')
   }
   function cancel(id: string) {
+    const run = runs.find((item) => item.id === id)
+    if (!run || run.status !== 'uploading') return
+    if (!window.confirm(`Cancel the upload of "${run.filename}"? You will need to select the file again to restart.`)) return
     setRuns((current) =>
       current.map((run) =>
-        run.id === id ? { ...run, status: 'cancelled' } : run
+        run.id === id && run.status === 'uploading' ? { ...run, status: 'cancelled' } : run
       )
     )
     setNotice('Preview upload cancelled. No file bytes were transferred.')
@@ -264,17 +260,6 @@ function App() {
             </div>
           </aside>
           <main className="main-content" id="main" ref={main} tabIndex={-1}>
-            <div className="preview-banner">
-              <span className="info-symbol" aria-hidden="true">
-                i
-              </span>
-              <p>
-                <strong>A preview, not a processor.</strong> No real
-                transcription. Files are not uploaded or saved; demo changes
-                reset on reload.
-              </p>
-              <span className="preview-label">UI PREVIEW</span>
-            </div>
             <div className="notification" role="status">
               {notice}
             </div>
@@ -282,7 +267,6 @@ function App() {
               <UploadPage
                 onBegin={(run) => {
                   setRuns((current) => [run, ...current])
-                  setScenario('normal')
                   setPage('history')
                   setNotice(
                     'Preview started. Progress is simulated; no file bytes are uploaded or saved.'
@@ -315,10 +299,8 @@ function App() {
             ) : (
               <HistoryPage
                 runs={runs}
-                scenario={scenario}
-                loading={loading}
-                onScenarioChange={setScenario}
-                onRefresh={() => setLoading(true)}
+                view={historyView}
+                onViewChange={setHistoryView}
                 onUpload={() => navigate('upload')}
                 onOpen={(id) => {
                   setSelected(id)
@@ -329,8 +311,7 @@ function App() {
               />
             )}
             <footer className="page-footer">
-              <span>SSScribe — make every word count.</span>
-              <span>Local auth connected · History is a preview</span>
+              <span>SSScribe version {APP_VERSION} · Development</span>
             </footer>
           </main>
         </div>

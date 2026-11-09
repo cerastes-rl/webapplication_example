@@ -2,7 +2,7 @@
 
 ## Status and purpose
 
-**Local authentication complete; user interaction review approved on 2026-11-09. Connected History and processing remain planned.** The current app combines a React preview with FastAPI health and Austin/John sign-in/me/sign-out endpoints. A separate minimal `backend/speech_mock.py` now reads/writes local text files under `backend/data/blobs/`, with no HTTP storage dependency. Its job dictionary is in memory; the durable service architecture below remains planned. Broader UI acceptance and approval remain pending; SQL persistence and ownership filtering are deferred.
+**Local authentication complete; user interaction review approved on 2026-11-09. Connected History and processing remain planned.** The current app combines a React preview with FastAPI health and Austin/John sign-in/me/sign-out endpoints. A separate minimal `backend/speech_mock.py` now reads/writes local text files under `backend/data/blobs/`, with no HTTP storage dependency. Its job dictionary is in memory; the durable service architecture below remains planned. The user approved the current UI on 2026-11-09. Responsive layout review is deferred; browser/accessibility checks and focused interaction tests remain follow-up validation. Connected History/upload integration, SQL persistence and ownership filtering remain planned.
 
 Build one usable local journey: sign in, upload a recording, follow durable progress, read a stored sample transcript, retry a processing failure and cancel an upload. Records and audio survive reloads and service restarts. Recognition is simulated and clearly labeled.
 
@@ -14,7 +14,7 @@ This is the delivery guide for M2 in [requirements](REQUIREMENTS.md). The [imple
 
 | Component | Local implementation | Owns | Azure equivalent | Implemented |
 |---|---|---|---|---|
-| Frontend | React/TypeScript/Vite, port 5173 | UI preview and typed auth client; recording API client and actual shell-owned upload remain planned | Static Web Apps | ✅ UI preview + auth integration |
+| Frontend | React/TypeScript/Vite, port 5173 | UI preview and typed auth client; recording API client and actual shell-owned upload remain planned | Static Web Apps | ✅ UI complete for current scope; user approved 2026-11-09; auth integrated |
 | Application | FastAPI/Uvicorn, port 8000, one worker | Health and authentication; recording business rules, application SQL and background execution remain planned | App Service | ✅ Health + auth only |
 | Application database | Planned SQLite through SQLAlchemy | Runs, files, jobs, transcripts | Azure SQL Database | ❌ |
 | Storage mock | Planned separate FastAPI process, proposed port 8001 | Upload grants, streamed bytes, object metadata and partial cleanup | Private Blob Storage | ❌ |
@@ -140,7 +140,7 @@ Implement and verify each slice before proceeding. Do not create a temporary sta
 
 | Slice | Deliverable | Evidence to proceed |
 |---|---|---|
-| 0. UI acceptance | Finish focused interaction tests and browser/keyboard/theme review; record explicit UI approval. | Existing UI accepted; lint/build/tests pass. |
+| 0. UI acceptance — complete for current scope | User approved sign-in, Upload, History and transcript details on 2026-11-09. Responsive layout review is deferred; browser/accessibility checks and focused interaction tests remain follow-up work. | Explicit UI approval recorded; lint/build pass. Connected workflow acceptance remains separate. |
 | 1. Persistent History (auth implemented) | Data exclusions, SQLite models, user-owned run DTOs/routes, recording API client and API-backed History/details. Seed labeled completed examples; add the retriable example when its source exists. | Refresh retains session/data; restart retains data; signed-out and other-owner reads fail; missing/incomplete transcript states work. |
 | 2. Real upload | Record connected policy; storage mock, authorization/idempotency, streaming, completion, shell progress, cancellation and upload reconciliation. | Stored bytes equal input; exact/over-limit checks; navigation preserves transfer; duplicate completion creates one job; lost completion/cancel/disconnect recover correctly. |
 | 3. Processing and retry | Durable Speech mock, adapters, supervised worker, result import and processing retry. | Upload reaches stored transcript; failure retries once; duplicate retry does not submit twice; mock checks source through HTTP. |

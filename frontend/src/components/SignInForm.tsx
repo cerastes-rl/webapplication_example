@@ -20,15 +20,9 @@ export function SignInForm({
 }: SignInFormProps) {
   return (
     <div className="panel signin-card">
-      <span className="eyebrow">WELCOME TO SSScribe</span>
-      <h1>
-        A little more clarity.
-        <br />
-        One recording at a time.
-      </h1>
+      <h1>SSScribe</h1>
       <p>
-        Upload recordings, follow their progress, and bring your conversations
-        into focus.
+        An application to upload user recordings, track transcription progress, and view transcripts.
       </p>
       {loading ? (
         <p role="status">Checking your session…</p>
@@ -45,12 +39,9 @@ export function SignInForm({
               required
               maxLength={32}
               disabled={busy}
-              aria-describedby="access-key-hint auth-error"
+              aria-describedby="auth-error"
             />
           </label>
-          <p id="access-key-hint">
-            Enter <strong>austin</strong> or <strong>john</strong>.
-          </p>
           <p id="auth-error" className="field-error" role="alert">
             {error}
           </p>
@@ -59,11 +50,6 @@ export function SignInForm({
           </button>
         </form>
       )}
-      <small>
-        Local sign-in. History and uploads use shared sample data.
-        <br />
-        User-specific SQL history will be added later.
-      </small>
     </div>
   )
 }

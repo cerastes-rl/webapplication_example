@@ -1,6 +1,6 @@
 # SSScribe — Transcription workspace
 
-SSScribe is a React UI preview for submitting recordings, following simulated progress and reading sample transcripts. It uses navy-blue accents, light/dark themes and local Austin/John authentication. Preview runs live in browser memory; theme preference persists in localStorage.
+SSScribe is a React UI preview for submitting recordings, following simulated progress and reading sample transcripts. It uses `#15263B` navy accents in both light/dark themes and local Austin/John authentication. Preview runs live in browser memory; theme preference persists in localStorage.
 
 ## Documentation
 
@@ -16,15 +16,17 @@ SSScribe is a React UI preview for submitting recordings, following simulated pr
 ## Current capabilities
 
 - Persistent SSScribe banner, Upload/History navigation and backend sign-in/out. Enter `austin` or `john` as the access key; existing sessions are restored on load.
-- MP3/WAV picker with extension and size validation: non-empty files up to **4 GB (4,000,000,000 bytes inclusive)**.
+- MP3/WAV picker with extension and size validation (also accepts `.txt` without changing the displayed guidance): non-empty files up to **1 GB**.
 - Requested speakers: Automatic or 1–10. Language: English. Speaker labels and timestamps default on.
 - Begin upload creates an in-memory Run ID and navigates to History. Simulated progress continues across internal navigation: uploading → finalizing → queued → processing → completed.
-- History includes three completed fixtures and one retriable failure, saved options, status, open/retry/cancel actions and sample transcript details.
-- Preview controls for normal, empty, error and loading History states.
+- History temporarily includes 64 sample recordings for pagination review (`EXTRA_HISTORY_EXAMPLES` in `frontend/src/config.ts` controls the extra 60), saved options, separate upload/transcription statuses, View transcript/Retry/Cancel buttons and sample transcript details. Pagination offers 10, 25 or 50 recordings per page, with filename search and sortable Submitted and Size columns (newest first by default).
+- Upload cancellation asks for confirmation from History and details.
 - Sign-out confirms cancellation of active simulated transfers, revokes the backend session and clears the preview workspace. Each sign-in starts fresh shared sample runs; SQL ownership filtering is planned.
+- Recording details show the transcript beside recording metadata, upload/transcription statuses and saved transcription settings. Completed transcripts can be copied or downloaded as identical plain text.
+- The shared footer displays the development version configured in `frontend/src/config.ts`.
 - Theme toggle, responsive layout, scrollable History table, labeled controls, skip link, focus styles and reduced-motion support.
 
-Reloading restores initial preview runs, navigation and form, then checks the backend session to restore identity. All completed runs use the shared sample transcript. Browser, keyboard, responsive and accessibility review remains the current acceptance task.
+Reloading restores initial preview runs, navigation and form, then checks the backend session to restore identity. All completed runs use the shared sample transcript. The user approved the current UI on 2026-11-09. Responsive layout review is deferred; browser/accessibility checks and focused interaction tests remain follow-up work.
 
 ## Run the UI
 
@@ -125,7 +127,7 @@ A maintenance loop advances jobs without polling and removes only terminal job e
 
 ## Planned connected application
 
-**Local auth is complete and its interaction review was approved by the user on 2026-11-09; broader UI acceptance and connected History/upload integration remain pending.** Follow the [local implementation plan](docs/LOCAL_IMPLEMENTATION_PLAN.md) for delivery and its [component status table](docs/LOCAL_IMPLEMENTATION_PLAN.md#1-small-local-architecture) for what is implemented. The connected milestone makes FastAPI/SQLite authoritative for runs, status and transcripts, with actual audio stored by a separate HTTP storage mock. A separate Speech API mock produces deterministic batch results.
+**Local auth is complete and its interaction review was approved by the user on 2026-11-09; the current UI was also approved on 2026-11-09. Connected History/upload integration remains planned, with responsive layout review deferred.** Follow the [local implementation plan](docs/LOCAL_IMPLEMENTATION_PLAN.md) for delivery and its [component status table](docs/LOCAL_IMPLEMENTATION_PLAN.md#1-small-local-architecture) for what is implemented. The connected milestone makes FastAPI/SQLite authoritative for runs, status and transcripts, with actual audio stored by a separate HTTP storage mock. A separate Speech API mock produces deterministic batch results.
 
 FastAPI hosts request handlers and lifespan-managed background loops. SQL stores workflow state, claims, Speech IDs, next-action times, errors and unfinished imports. Loops query due rows, submit jobs, poll Speech, import results and recover interrupted work.
 
@@ -144,6 +146,6 @@ Start with one backend process, one Uvicorn worker and one App Service instance.
 
 Production can later move background execution to [timer/queue-triggered Azure Functions](docs/IMPLEMENTATION_PLAN.md#production-consideration-timer-and-queue-triggered-azure-functions) when independent worker scaling is justified. This is an optional production consideration.
 
-**Open decisions:** connected size/duration policy, Speech option mapping, production session/access contracts and cleanup intervals. Local session and upload cancellation contracts are defined in the local implementation plan. The preview's 4 GB limit must be reconciled with Speech batch's documented **1 GB input** and **240-minute diarization** limits. See [Speech planning notes and sources](docs/IMPLEMENTATION_PLAN.md#azure-speech-api-interaction).
+**Open decisions:** connected size/duration policy, Speech option mapping, production session/access contracts and cleanup intervals. Local session and upload cancellation contracts are defined in the local implementation plan. The preview limit is **1 GB**; connected validation must also account for Speech batch's **240-minute diarization** limit. See [Speech planning notes and sources](docs/IMPLEMENTATION_PLAN.md#azure-speech-api-interaction).
 
 The local database is `backend/data/databases/app.db`; `backend/data/uploads/` remains a proposed upload store. Local databases, sidecars, audio and partials are ignored by Git. Document service startup, seeds, reset and cleanup commands as those features are delivered.

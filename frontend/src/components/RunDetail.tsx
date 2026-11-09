@@ -1,4 +1,5 @@
-import { formatDate, formatSize, sampleTranscript } from '../preview'
+import { useState } from 'react'
+import { formatDate, formatSize, getRunStatuses, transcriptText } from '../preview'
 import type { Run } from '../preview'
 import { EmptyState } from './EmptyState'
 import { StatusBadge } from './StatusBadge'
@@ -14,6 +15,42 @@ export function RunDetail({
   onRetry: () => void
   onCancel: () => void
 }) {
+  const [exportMessage, setExportMessage] = useState('')
+  async function copyTranscript() {
+    try {
+      await navigator.clipboard.writeText(transcriptText(run))
+      setExportMessage('Transcript copied.')
+    } catch {
+      setExportMessage('Could not copy the transcript. Try downloading it instead.')
+    }
+  }
+  function downloadTranscript() {
+    try {
+      const blob = new Blob([transcriptText(run)], { type: 'text/plain;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `${run.filename.replace(/\.[^.]+$/, '')}_transcript.txt`
+      document.body.append(link)
+      link.click()
+      link.remove()
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+      setExportMessage('Transcript download started.')
+    } catch {
+      setExportMessage('Could not download the transcript. Please try again.')
+    }
+  }
+  const statuses = getRunStatuses(run)
+  const stateMessages = {
+    uploading: ['Uploading recording', `Upload is ${run.progress}% complete.`],
+    finalizing: ['Finalizing upload', 'The recording is being prepared for transcription.'],
+    queued: ['Transcription queued', 'Transcription will begin when the recording is ready to process.'],
+    processing: ['Transcription in progress', 'The transcript will appear here when processing completes.'],
+    failed: ['Transcription failed', run.error ?? 'Transcription could not finish. Retry to process this recording again.'],
+    cancelled: ['Upload cancelled', 'Select the recording again on the Upload page to start a new upload.'],
+    completed: ['Transcript ready', '']
+  }
+  const [stateTitle, stateDescription] = stateMessages[run.status]
   return (
     <>
       <button className="back-button" onClick={onBack}>
@@ -21,61 +58,31 @@ export function RunDetail({
       </button>
       <div className="page-heading">
         <div>
-          <span className="eyebrow">RUN DETAILS · {run.id}</span>
+          <span className="eyebrow">{run.id}</span>
           <h1 className="filename-heading">{run.filename}</h1>
           <p>
             {formatDate(run.created)} <span className="dot-separator">·</span>{' '}
             {formatSize(run.size)}
           </p>
         </div>
-        <StatusBadge status={run.status} />
       </div>
       <div className="detail-layout">
         <section className="panel transcript-panel">
           <div className="panel-title">
             <h2>Transcript</h2>
-            <span className="subtle-tag">SAMPLE RESULT</span>
+            {run.status === 'completed' && (
+              <div className="transcript-actions">
+                <p className="export-message" role="status">{exportMessage}</p>
+                <button className="button secondary" onClick={copyTranscript}>Copy</button>
+                <button className="button secondary" onClick={downloadTranscript}>Download</button>
+              </div>
+            )}
           </div>
           {run.status === 'completed' ? (
-            <>
-              <div className="transcript-notice">
-                Illustrative sample text — not derived from this recording.
-                Timestamps and speaker names are examples.
-              </div>
-              <div className="transcript">
-                {sampleTranscript.map((segment, i) => (
-                  <div className="transcript-segment" key={segment.time}>
-                    {(run.labels || run.timestamps) && (
-                      <div className="segment-label">
-                        {run.labels && (
-                          <strong>
-                            {run.speakers === 1 ? 'Speaker 1' : segment.speaker}
-                          </strong>
-                        )}
-                        {run.timestamps && <span>{segment.time}</span>}
-                      </div>
-                    )}
-                    <p key={i}>{segment.text}</p>
-                  </div>
-                ))}
-              </div>
-            </>
+            <pre className="transcript">{transcriptText(run)}</pre>
           ) : (
-            <EmptyState
-              title={
-                run.status === 'failed'
-                  ? 'This run needs another try'
-                  : run.status === 'cancelled'
-                    ? 'Upload cancelled'
-                    : 'Your transcript is on its way'
-              }
-            >
-              {run.error ??
-                (run.status === 'uploading'
-                  ? `Simulated upload is ${run.progress}% complete. You can navigate away within the app.`
-                  : run.status === 'cancelled'
-                    ? 'Choose your file again on the Upload page to start a new preview.'
-                    : 'This preview will update automatically. No real transcription is performed.')}
+            <EmptyState title={stateTitle}>
+              {stateDescription}
             </EmptyState>
           )}
           {run.status === 'uploading' && (
@@ -83,27 +90,40 @@ export function RunDetail({
               <progress
                 max={100}
                 value={run.progress}
-                aria-label="Simulated upload progress"
+                aria-label="Upload progress"
               />
               <button className="button secondary" onClick={onCancel}>
-                Cancel preview upload
+                Cancel upload
               </button>
             </div>
           )}
           {run.status === 'failed' && (
             <div className="detail-progress">
               <button className="button primary" onClick={onRetry}>
-                Retry processing
+                Retry
               </button>
             </div>
           )}
         </section>
         <aside className="panel settings-panel">
-          <h2>Run information</h2>
+          <h2>Recording details</h2>
           <dl>
             <dt>Run ID</dt>
             <dd className="mono">{run.id}</dd>
-            <dt>Requested speakers</dt>
+            <dt>Upload status</dt>
+            <dd><StatusBadge status={statuses.upload} /></dd>
+            <dt>Transcription status</dt>
+            <dd><StatusBadge status={statuses.transcription} /></dd>
+            <dt>Submitted</dt>
+            <dd>{formatDate(run.created)}</dd>
+            <dt>File size</dt>
+            <dd>{formatSize(run.size)}</dd>
+            <dt>Processing attempts</dt>
+            <dd>{run.attempts}</dd>
+          </dl>
+          <h2 className="settings-heading">Transcription settings</h2>
+          <dl>
+            <dt>Number of speakers</dt>
             <dd>{run.speakers ?? 'Automatic'}</dd>
             <dt>Language</dt>
             <dd>{run.language}</dd>
@@ -111,13 +131,7 @@ export function RunDetail({
             <dd>{run.labels ? 'Enabled' : 'Disabled'}</dd>
             <dt>Timestamps</dt>
             <dd>{run.timestamps ? 'Enabled' : 'Disabled'}</dd>
-            <dt>Processing attempts</dt>
-            <dd>{run.attempts}</dd>
           </dl>
-          <p className="settings-note">
-            Options are saved in preview memory only. They do not perform real
-            audio analysis.
-          </p>
         </aside>
       </div>
     </>
