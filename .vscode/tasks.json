@@ -51,6 +51,22 @@
         "panel": "dedicated",
         "reveal": "silent"
       }
+    },
+    {
+      "label": "Initialize Database",
+      "type": "shell",
+      "command": ".venv/bin/python database.py",
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
+      "problemMatcher": [],
+      "runOptions": {
+        "runOn": "folderOpen"
+      },
+      "presentation": {
+        "panel": "dedicated",
+        "reveal": "silent"
+      }
     }
   ]
 }

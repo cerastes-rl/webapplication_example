@@ -15,6 +15,9 @@
 # avoid generated logs?
 .devcontainer/logs/
 
+# Local SQLite databases and sidecars
+backend/data/databases/
+
 # Local application and mock data
 backend/data/*
 !backend/data/blobs/

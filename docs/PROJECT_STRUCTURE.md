@@ -59,6 +59,8 @@ SSScribe/                            Repository root (actual checkout name may d
 |
 |--- backend/                        Python/FastAPI application API and standalone mock
 |    |--- main.py                    FastAPI app, health, auth router and HTTP errors
+|    |--- database.py                Explicit SQLite initialization command
+|    |--- schema.sql                 Accepted single-table runs schema
 |    |--- auth.py                    Austin/John sessions and reusable current-user dependency
 |    |--- tests/test_auth.py         Standard-library auth tests over real HTTP
 |    |--- speech_mock.py             Separate batch mock: submit, timed states, result files and expiry
@@ -80,7 +82,7 @@ SSScribe/                            Repository root (actual checkout name may d
 |    |--- start-dev.sh               Optional helper to start Vite, the API and Speech mock
 |
 |--- .vscode/
-|    |--- tasks.json                 VS Code startup tasks for Vite, FastAPI and Speech mock
+|    |--- tasks.json                 VS Code startup tasks for Vite, FastAPI, Speech mock and database initialization
 |
 |--- .github/
      |--- dependabot.yml             Automated dependency-update configuration
@@ -109,7 +111,7 @@ SSScribe/                            Repository root (actual checkout name may d
 - **Vite:** React plugin, port 5173 and `/api` proxy to `http://localhost:8000`. `public/` files are served at root paths; imported source assets are bundled.
 - **Backend:** `main.py` exports `app` for `uvicorn main:app`. `requirements.txt` pins FastAPI/Uvicorn/Pydantic and supporting dependencies. Use `backend/.venv` and pip requirements.
 - **Dev container:** Python image with Node/pnpm, ports 5173/8000/8002. On creation, `postCreateCommand` creates/reuses the venv and installs requirements. Rebuild to apply setup changes; rerun pip after requirements changes. The lockfile records resolved feature metadata.
-- **Startup:** `.vscode/tasks.json` defines folder-open tasks for Vite, the API and Speech mock. Speech runs on port 8002 without reload to preserve in-memory jobs during code edits. `.devcontainer/start-dev.sh` starts missing services and logs to `.devcontainer/logs/` (`speech-mock.log` for Speech). It installs requirements when creating a missing venv. Install frontend dependencies with pnpm and update existing venvs explicitly.
+- **Startup:** `.vscode/tasks.json` defines folder-open tasks for Vite, the API, Speech mock and **Initialize Database** (`.venv/bin/python database.py` from `backend/`). Database initialization runs once per folder open and preserves existing rows. Speech runs on port 8002 without reload to preserve in-memory jobs during code edits. `.devcontainer/start-dev.sh` starts missing services and logs to `.devcontainer/logs/` (`speech-mock.log` for Speech). It installs requirements when creating a missing venv. Install frontend dependencies with pnpm and update existing venvs explicitly.
 - **Checks:** `.oxlintrc.json` owns lint rules; `tsconfig*.json` owns TypeScript configuration.
 - **Repository automation:** `.github/dependabot.yml` configures dependency updates.
 
@@ -180,6 +182,7 @@ All frontend paths in this table are relative to `frontend/` unless otherwise no
 | `frontend/dist/` | Generated production build. Ignored; recreate with `pnpm build`. |
 | `backend/.venv/` | Local Python environment. Ignored; recreate with venv/pip. |
 | `backend/__pycache__/`, `*.pyc` | Generated Python bytecode, ignored. |
+| `backend/data/databases/app.db` | Local SQLite runs table, created with `backend/.venv/bin/python backend/database.py`; database and sidecars ignored. |
 | `backend/data/` | Local stores are ignored except `example*` files directly inside `blobs/audio/`. `blobs/audio/` contains local text sources and `blobs/transcripts/` can hold Speech mock results. Job expiry never deletes files. |
 | `.devcontainer/logs/` | Helper logs (`vite.log`, `uvicorn.log`), ignored. |
 | Other editor caches / TypeScript build metadata | Tool output; handled by the applicable ignore rules. |
@@ -194,7 +197,7 @@ Root `.gitignore` and `frontend/.gitignore` define exclusions. Only `example*` f
 
 The [local architecture status table](LOCAL_IMPLEMENTATION_PLAN.md#1-small-local-architecture) tracks implemented components. Auth and its typed frontend client are complete; the user approved the auth interaction review on 2026-11-09. Future modules cover recording routes/client, SQLAlchemy models, upload/storage adapters, a Speech client and lifespan-managed SQL polling loops. Separate storage and Speech HTTP mocks own audio and simulated service jobs/results. Main FastAPI owns application SQL and business logic.
 
-Proposed stores are `backend/data/app.db` and `backend/data/uploads/`; add DB/sidecar/upload/partial exclusions before generating them. SQL retains workflow state, claims, Speech IDs, due times and unfinished imports across restarts. See the [local implementation plan](LOCAL_IMPLEMENTATION_PLAN.md) for candidate modules, contracts and delivery order, and the [architecture plan](IMPLEMENTATION_PLAN.md) for the Azure end state.
+The current database is `backend/data/databases/app.db`, initialized by `backend/database.py` manually or through the VS Code folder-open task from `backend/schema.sql`. It contains the accepted single `runs` table with sequential IDs, ownership, file metadata, options, application and Speech statuses, transcript, error and UTC timestamps. Application updates must set `updated_at`. Initialization preserves existing rows and does not perform schema migrations. API/worker/UI integration is pending; the older multi-table and scheduling-field proposals are future planning references. `backend/data/uploads/` remains proposed. Local data and database sidecars are already ignored. See the [local implementation plan](LOCAL_IMPLEMENTATION_PLAN.md) for candidate modules, contracts and delivery order, and the [architecture plan](IMPLEMENTATION_PLAN.md) for the Azure end state.
 
 See the [frontend source layout](../frontend/README.md#source-layout) for module responsibilities and the sign-in call path.
 

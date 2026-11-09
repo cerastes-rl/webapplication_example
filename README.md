@@ -75,9 +75,23 @@ backend/.venv/bin/python -m unittest discover -s backend/tests -v
 
 The dev container forwards 5173/8000/8002. On container creation, `postCreateCommand` creates/reuses `backend/.venv` and installs `backend/requirements.txt`. Rebuild the container to apply setup changes. After dependency changes, run `backend/.venv/bin/python -m pip install -r backend/requirements.txt` from the repository root.
 
-`.vscode/tasks.json` defines folder-open startup tasks for Vite, the main FastAPI app and the Speech mock. You can also run **Start Speech Mock** from VS Code's Run Task menu. `.devcontainer/start-dev.sh` starts missing services and writes logs under `.devcontainer/logs/`, including `speech-mock.log`. It installs Python requirements when creating a missing venv; update existing environments explicitly. Install frontend dependencies with pnpm.
+`.vscode/tasks.json` defines folder-open startup tasks for Vite, the main FastAPI app, the Speech mock and database initialization. You can also run **Start Speech Mock** from VS Code's Run Task menu. `.devcontainer/start-dev.sh` starts missing services and writes logs under `.devcontainer/logs/`, including `speech-mock.log`. It installs Python requirements when creating a missing venv; update existing environments explicitly. Install frontend dependencies with pnpm.
 
 See the [project structure guide](docs/PROJECT_STRUCTURE.md) for the source tree and editing map. Frontend UI components live in `src/components/`, static images in `src/assets/` and auth requests in `src/api/`; `App.tsx` coordinates shared state and navigation.
+
+## Local SQLite database
+
+Create the database from the repository root using the existing Python environment:
+
+```bash
+backend/.venv/bin/python backend/database.py
+```
+
+VS Code also runs this initialization on folder open through the **Initialize Database** task. This creates `backend/data/databases/app.db` with one empty `runs` table on first initialization. Repeating the command preserves existing rows. The database and its sidecars are ignored by Git; `backend/schema.sql` is the maintained schema and `backend/database.py` initializes it using Python's built-in SQLite support.
+
+The table stores sequential run IDs, ownership, source metadata, saved options, application/Speech statuses, transcript text, errors and UTC timestamps. Speech statuses match the current mock: `NotStarted`, `Running`, `Succeeded`, `Failed`. Nullable fields remain `NULL` until known; Automatic speakers is `NULL`, and booleans use `0`/`1`. Inserts default to `uploading`, `en-US`, enabled speaker labels/timestamps and current UTC timestamps. Future application updates must set `updated_at` explicitly.
+
+Database creation is implemented. API access, worker processing and UI persistence remain pending. The accepted single-table schema supersedes the earlier multi-table proposal for the current local slice. Re-running initialization creates missing tables; it does not migrate an existing schema.
 
 ## Run the standalone Speech mock
 
@@ -132,4 +146,4 @@ Production can later move background execution to [timer/queue-triggered Azure F
 
 **Open decisions:** connected size/duration policy, Speech option mapping, production session/access contracts and cleanup intervals. Local session and upload cancellation contracts are defined in the local implementation plan. The preview's 4 GB limit must be reconciled with Speech batch's documented **1 GB input** and **240-minute diarization** limits. See [Speech planning notes and sources](docs/IMPLEMENTATION_PLAN.md#azure-speech-api-interaction).
 
-Proposed local persistence paths are `backend/data/app.db` and `backend/data/uploads/`. Add Git exclusions for databases, sidecars, audio and partials before generating them. Document service startup, seeds, reset and cleanup commands as those features are delivered.
+The local database is `backend/data/databases/app.db`; `backend/data/uploads/` remains a proposed upload store. Local databases, sidecars, audio and partials are ignored by Git. Document service startup, seeds, reset and cleanup commands as those features are delivered.
