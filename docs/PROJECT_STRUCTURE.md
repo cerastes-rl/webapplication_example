@@ -1,6 +1,6 @@
 # SSScribe project structure
 
-See [README](../README.md) for commands, [requirements](REQUIREMENTS.md) for acceptance and the single [implementation plan](IMPLEMENTATION_PLAN.md) for current architecture and next work.
+See [README](../README.md) for commands, [requirements](REQUIREMENTS.md) for acceptance and the [implementation matrix](IMPLEMENTATION_PLAN.md#local-implementation-matrix) for current features, Azure equivalents and next work.
 
 ## Maintained source
 
@@ -68,7 +68,7 @@ The single `runs` table stores owner, filename/size/options, private storage key
 
 ## Backend processing
 
-FastAPI lifespan starts one worker from `src/processing.py`. Each cycle visits submit, poll and import selections in order, one run at a time, and waits two seconds. SQL helpers in `src/database.py` select runs, claim submissions, save raw/mapped Speech statuses and atomically persist transcripts with completion. `src/speech_client.py` owns HTTP requests, result listing pagination and transcript JSON extraction.
+FastAPI lifespan starts one background thread running the ordinary loop in `src/processing.py`. Each cycle visits submit, poll and import selections in order, one run at a time. One stop event handles the two-second wait and shutdown. SQL helpers in `src/database.py` select runs, claim submissions, save raw/mapped Speech statuses and atomically persist transcripts with completion. `src/speech_client.py` owns HTTP requests, result listing pagination and transcript JSON extraction.
 
 Confirmed jobs and unfinished imports resume after API restart. Submission uncertainty is retained without automatic resubmission. Poll/download outages retry on later cycles; missing jobs/results and malformed content record failure. No database initialization occurs in the worker. See [configuration and error behavior](../README.md#connected-speech-processing).
 

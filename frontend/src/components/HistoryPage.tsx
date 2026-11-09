@@ -1,11 +1,12 @@
 import { useRef } from 'react'
-import { SortableHeader } from './SortableHeader'
-import { EmptyState } from './EmptyState'
-import { Icon } from './Icon'
-import { StatusBadge } from './StatusBadge'
-import { formatDate, formatSize } from '../run'
-import type { Run, UploadProgress } from '../run'
-import type { HistoryViewState } from '../history'
+import type { ReactElement } from 'react'
+import type { HistoryViewState } from '../history.ts'
+import { formatDate, formatSize } from '../run.ts'
+import type { Run, UploadProgress } from '../run.ts'
+import { EmptyState } from './EmptyState.tsx'
+import { Icon } from './Icon.tsx'
+import { SortableHeader } from './SortableHeader.tsx'
+import { StatusBadge } from './StatusBadge.tsx'
 
 type HistoryPageProps = {
   runs: Run[]
@@ -27,7 +28,7 @@ export function HistoryPage({
   upload,
   onRefresh,
   onCancel
-}: HistoryPageProps) {
+}: HistoryPageProps): ReactElement {
   const searchInput = useRef<HTMLInputElement>(null)
   const { search, pageSize, page, sort } = view
   function changeSort(column: 'created' | 'size') {
@@ -43,8 +44,7 @@ export function HistoryPage({
     })
   }
   const query = search.trim().toLowerCase()
-  const matchingRuns = runs.filter((run) => run.filename.toLowerCase().includes(query))
-  const sortedRuns = [...matchingRuns].sort((a, b) => {
+  const matchingRuns = runs.filter((run) => run.filename.toLowerCase().includes(query)).sort((a, b) => {
     const difference = sort.column === 'created'
       ? Date.parse(a.created_at) - Date.parse(b.created_at)
       : (a.size_bytes ?? 0) - (b.size_bytes ?? 0)
@@ -54,7 +54,7 @@ export function HistoryPage({
   const pageCount = Math.max(1, Math.ceil(matchingRuns.length / pageSize))
   const currentPage = Math.min(page, pageCount)
   const start = (currentPage - 1) * pageSize
-  const visibleRuns = sortedRuns.slice(start, start + pageSize)
+  const visibleRuns = matchingRuns.slice(start, start + pageSize)
   const completed = runs.filter((run) => run.transcription_stage === 'completed').length
   const inProgress = runs.filter((run) => run.upload_stage === 'uploading' || ['queued', 'running', 'importing'].includes(run.transcription_stage)).length
 
@@ -162,7 +162,7 @@ export function HistoryPage({
             </nav>
           </div>
         </div>
-        {runs.length === 0 ? (
+        {runs.length === 0 && (
           <EmptyState
             title="A fresh start for your recordings"
             action={
@@ -173,7 +173,8 @@ export function HistoryPage({
           >
             Your uploads and transcripts will appear here.
           </EmptyState>
-        ) : matchingRuns.length === 0 ? (
+        )}
+        {runs.length > 0 && matchingRuns.length === 0 && (
           <EmptyState
             title="No matching recordings"
             action={
@@ -186,7 +187,8 @@ export function HistoryPage({
           >
             Try another filename or clear the search.
           </EmptyState>
-        ) : (
+        )}
+        {matchingRuns.length > 0 && (
           <div className="table-scroll">
             <table>
               <thead>

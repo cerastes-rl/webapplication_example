@@ -1,194 +1,191 @@
-# End-state API calls and data flow
+# API calls and data flow
 
-**Planned recording workflow.** Austin/John authentication is implemented as separately requested; connected History and TXT uploads are implemented through queued; Speech processing remains planned. These diagrams are an architecture reference, not the local implementation checklist. Follow the [local implementation plan](IMPLEMENTATION_PLAN.md) for concrete contracts and delivery order. Its run list/transcript reads and `/api/runs/{run_id}` retry/cancel routes replace the proposed file-based routes below; upload IDs still identify transfers. Local interrupted transfers restart as new submissions after reconciliation. The mock correlation lookup used for uncertain submissions is local-only and requires a verified replacement for Azure.
+This is the **implemented local flow**: React/Vite, FastAPI, SQLite and the two HTTP mocks. See the [implementation matrix](IMPLEMENTATION_PLAN.md#local-implementation-matrix) for Azure/live equivalents and [application contracts](IMPLEMENTATION_PLAN.md#application-contracts) for routes.
 
-FastAPI hosts HTTP routes and lifespan-managed background loops. SQL stores durable workflow state; loops query due rows to execute business functions.
+Every browser `/api` request passes through Vite's proxy on :5173 to FastAPI on :8000; the diagram labels that shared route once. Browser file bytes go directly to storage :8001. The application worker calls Speech :8002. Protected API routes resolve the cookie session, and run operations check ownership. SQL connections close before service HTTP calls.
 
-Production uses **Azure Static Web Apps, Azure App Service, private Azure Blob Storage, Azure SQL Database, Azure AI Speech and Microsoft Entra ID**. See the [component diagrams](IMPLEMENTATION_PLAN.md#architecture-diagrams).
-
-## Reading these diagrams
-
-These Mermaid sequence diagrams show calls in chronological order. Solid arrows show requests/operations; dotted arrows show responses. SQL arrows represent queries/transactions. FastAPI routes and background-loop lanes are responsibilities **inside one backend deployment**.
-
-- **User:** an application event handler initiates the call.
-- **After X:** our code explicitly calls the next operation after the preceding response/commit succeeds.
-- **Schedule:** a background timer we implement queries persisted due work. Startup recovery also runs when FastAPI starts.
-- **Service-managed:** Speech fetches authorized source audio after submission.
-
-The diagrams cover explicit application integrations. Application routes are proposed contracts. Speech examples use `api-version=2024-11-15`; pin/confirm the version and supported options before implementation.
-
-## 1. Persist the run, upload audio, mark the SQL job ready
+## Complete local sequence
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant UI as React upload manager
-    participant API as FastAPI routes
-    participant DB as Application SQL
-    participant Blob as Private Blob Storage
+    actor User
+    participant UI as React App and API clients
+    participant API as FastAPI :8000 via Vite /api proxy
+    participant DB as SQLite runs table
+    participant Storage as Storage mock :8001
+    participant Worker as Application Speech worker
+    participant Speech as Speech mock :8002
 
-    Note over UI,API: User: Begin upload with file metadata and options
-    UI->>API: POST /api/uploads/authorize
-    API->>DB: INSERT run, pending file and upload, save options
-    DB-->>API: Committed run and upload IDs
-    Note over API,Blob: After commit: generate restricted upload authorization
-    API-->>UI: Run ID, upload ID, authorized URL/method and constraints
-    Note over UI,Blob: After successful authorization response
-    UI->>Blob: Put Blob - PUT authorized object URL with audio bytes
-    Blob-->>UI: Stored successfully
-    Note over UI,API: After successful storage response
-    UI->>API: POST /api/uploads/complete with upload ID
-    API->>Blob: Get Blob Properties - HEAD object URL
-    Blob-->>API: Actual length and object metadata
-    API->>DB: Transaction: validate upload, finalize file and create ready queued job once
-    DB-->>API: Committed existing run, file and job IDs
-    API-->>UI: 202 with SQL-backed current state
-```
-
-**Implement explicitly:** shell-owned single-request transfer, measured progress, bounded-memory storage streaming, ownership/actual-byte validation and idempotent completion. Save the run/options **before** bytes move. Repeated completion returns the same records. A SQL commit makes work discoverable by the submission loop. Storage and SQL commit independently; recover abandoned objects and interrupted finalization safely.
-
-**Open upload policy:** reconcile the preview's 4 GB limit with Speech batch's documented 1 GB input and 240-minute diarization limits before connected implementation. Preserve the preview until the decision is recorded. Interrupted transfers restart from zero.
-
-Generate upload grants in application/library code. If user-delegation SAS is chosen, add **Get User Delegation Key** (`POST` Blob service URL with `restype=service&comp=userdelegationkey`) on cache miss/refresh. Source-read authorization may use a supported managed-identity or SAS strategy. Exact access/session design remains open. Persist provider/object key privately as durable file identity and resolve fresh access URLs when needed.
-
-## 2. SQL-driven submission loop inside FastAPI
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant L as FastAPI submission loop
-    participant DB as Application SQL
-    participant S as Azure Speech batch API
-    participant Blob as Private Blob Storage
-
-    Note over L,DB: Schedule: ready-job scan, also at backend startup
-    L->>DB: SELECT eligible ready jobs whose next action is due
-    DB-->>L: Job IDs, saved options and source references
-    L->>DB: Conditional claim and durable submission-start state, increment attempt once
-    DB-->>L: Claim acquired, or skip if no longer eligible
-    Note over L,S: After eligible claim commits: resolve fresh source access
-    L->>S: Transcription - Submit - POST /speechtotext/transcriptions:submit
-    Note over L,S: JSON includes contentUrls, locale, displayName and supported properties
-    S-->>L: Accepted transcription ID and self URL
-    L->>DB: Persist Speech ID, monitoring state and next_poll_at
-    Note over S,Blob: Service-managed asynchronous processing after Submit acceptance
-    S->>Blob: Get Blob - GET authorized source audio
-    Blob-->>S: Audio bytes
-```
-
-SQL records readiness, claims/submission-start, attempts, Speech IDs, due times and errors. Recovery resumes monitoring saved Speech IDs. Lost Submit responses/crashes require an explicit uncertain-submission state and reconciliation, because SQL and Speech commit independently.
-
-## 3. Scheduled Speech status polling and result import
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant L as FastAPI monitoring and import loop
-    participant DB as Application SQL
-    participant S as Azure Speech batch API
-    participant Results as Returned result-content endpoint
-
-    Note over L,DB: Schedule: scan due pending jobs, also at backend startup
-    L->>DB: SELECT saved Speech IDs and unfinished imports due now
-    DB-->>L: Claimed work, Speech IDs and saved run options
-    loop Each due nonterminal transcription
-        L->>S: Transcription - Get - GET /speechtotext/transcriptions/{id}
-        S-->>L: NotStarted / Running / Succeeded / Failed
-        L->>DB: Save state or failure, and next action time
+    Note over UI,Speech: PART 1 - Service startup and page load or refresh
+    Note over API,DB: Explicit database.py / VS Code task initializes SQL before use
+    API->>Worker: lifespan() starts run_worker(path, stop) in a background thread
+    UI->>API: App session effect → getCurrentUser() → GET /api/auth/me
+    API->>API: me() → get_current_user() reads HttpOnly session cookie
+    alt Valid in-memory session
+        API-->>UI: 200 User
+        UI->>UI: setUser(); loadHistory()
+    else No session or API restarted
+        API-->>UI: 401 → getCurrentUser() returns null
+        UI->>UI: Show SignInForm
+    else Service/request error
+        API-->>UI: Error → show auth error
     end
-    Note over L,S: After Succeeded, or recovery of unfinished successful import
-    L->>S: Transcription - List Files - GET /speechtotext/transcriptions/{id}/files
-    S-->>L: File kinds, links.contentUrl and optional nextLink
-    Note over L,Results: After listing identifies required transcript and report entries
-    L->>Results: GET returned contentUrl
-    Results-->>L: Transcript and report JSON
-    L->>DB: Transaction: upsert readable transcript and mark run/job completed
-    Note over L,DB: Invalid or failed individual results persist a useful failure instead
+
+    Note over User,DB: PART 2 - Manual sign-in and History reads
+    opt User submits the sign-in form
+        User->>UI: submitSignIn(event)
+        UI->>API: signIn(accessKey) → POST /api/auth/sign-in
+        alt Exact austin or john key
+            API->>API: sign_in(): replace old session token; set HttpOnly cookie
+            API-->>UI: 200 User
+            UI->>UI: resetWorkspace(); setUser(); refreshHistory()
+        else Invalid key
+            API-->>UI: 401 → display sign-in error
+        end
+    end
+    opt Valid restore/sign-in, History entry, mutation or Refresh
+        UI->>API: loadHistory() → listRecordings(signal) → GET /api/runs
+        API->>DB: list_runs() → database.list_runs(path, user.id)
+        DB-->>API: All owned public run fields, newest first
+        API-->>UI: 200 Run[]
+        UI->>UI: Ignore aborted/stale session response; setRuns(); local search/sort/page
+    end
+
+    Note over User,Storage: PART 3 - Create, transfer and confirm one TXT upload
+    User->>UI: UploadPage validates file/options → beginUpload(file, settings)
+    UI->>UI: Create AbortController; set one active upload
+    UI->>API: authorizeUpload() → POST /api/uploads/authorize (metadata only)
+    API->>DB: authorize() → create_upload(): INSERT owned run/options
+    DB-->>API: New numeric run_id; uploading / not_started
+    API-->>UI: 200 run, unsigned upload_url and PUT headers
+    UI->>UI: saveRun(); open History; refreshHistory()
+    UI->>Storage: putFile() → XHR PUT raw File, directly to :8001
+    Storage->>Storage: put_blob(): stream temporary file; verify length; atomic replace
+    alt PUT succeeds
+        Storage-->>UI: 201; XHR reports measured upload progress
+        UI->>API: completeUpload(id) → POST /api/uploads/complete
+        API->>DB: complete() → upload_record(): owned current state
+        API->>Storage: inspect_or_delete(key, HEAD)
+        Storage-->>API: Content-Length or 404/error
+        alt Exact stored size and upload still eligible
+            API->>DB: update_upload(): conditional upload completed
+            DB-->>API: Current run; transcription remains not_started
+            API-->>UI: 200 Run → saveRun()
+        else Missing/wrong bytes, cancellation or service error
+            API-->>UI: 409/503 → display error; require reselection/new submission
+        end
+    else PUT fails
+        Storage-->>UI: HTTP/network error
+        UI->>API: failUpload(id) → POST /api/runs/{id}/upload-failed
+        API->>DB: failed() → guarded update_upload(failed)
+        API-->>UI: Current run or error; original row stays in History
+    else User cancels during transfer
+        User->>UI: cancel(id): confirm; abort active XHR
+        UI->>API: cancelUpload(id) → POST /api/runs/{id}/cancel
+        API->>DB: cancel() → guarded update_upload(cancelled)
+        opt Cancellation persisted
+            API->>Storage: inspect_or_delete(key, DELETE)
+            Storage-->>API: 202 or missing blob; outages return 503
+        end
+        API-->>UI: Current cancelled run or error
+    end
+    UI->>UI: Clear active upload; refreshHistory() after mutation
+    Note over UI,Storage: Interrupted/unconfirmed uploads require reselection; a late PUT can leave orphaned bytes
+
+    Note over API,Speech: PART 4 - Background processing continues independently of the page
+    loop Each cycle: submit pass, poll pass, import pass; wait two seconds
+        Worker->>DB: process_cycle() → processing_runs(path, phase), ordered by run_id
+        DB-->>Worker: Eligible runs for that phase
+        opt Completed upload with not_started transcription and no job ID
+            Worker->>DB: process_run(submit) → claim_submission(): submission_uncertain
+            Worker->>Speech: speech_client.submit(run) → POST /speechtotext/transcriptions:submit
+            alt Confirmed submission
+                Speech-->>Worker: 201 job self/status
+                Worker->>DB: save_speech_status(): save job ID, raw status and mapped stage
+            else Known 4xx rejection except 408
+                Worker->>DB: save_processing_error(): failed
+            else Ambiguous outcome
+                Worker->>DB: save_processing_error(): retain submission_uncertain
+            end
+        end
+        Note over Storage,Speech: Speech reads shared local TXT path; its own timer advances jobs and writes result files
+        opt Saved job has absent, NotStarted or Running status and is not failed
+            Worker->>Speech: speech_client.poll(id) → GET /speechtotext/transcriptions/{id}
+            Speech-->>Worker: NotStarted / Running / Succeeded / Failed
+            Worker->>DB: save_speech_status(): queued / running / importing / failed
+        end
+        opt Succeeded job still importing
+            Worker->>Speech: speech_client.transcript(id) → GET /speechtotext/transcriptions/{id}/files
+            Speech-->>Worker: File kinds, contentUrl and optional @nextLink
+            Worker->>Speech: Follow pagination until Transcription; GET links.contentUrl
+            Speech-->>Worker: Transcript JSON
+            Worker->>DB: save_transcript(): display text + completed in one update
+        end
+        Note over Worker,Speech: Transient poll/download errors retry later; missing jobs/results or malformed content fail
+    end
+    Note over API,Speech: API restart resumes saved jobs/imports; Speech restart clears its jobs; terminal jobs expire after 30 minutes, files persist
+
+    Note over User,DB: PART 5 - Read completed transcript
+    User->>UI: Refresh/enter History to load backend state; open completed run
+    UI->>API: Detail effect → getTranscript(id, signal) → GET /api/runs/{id}/transcript
+    API->>DB: get_transcript() → database.get_transcript(path, user.id, id)
+    alt Owned run has completed transcript
+        DB-->>API: Stored readable text
+        API-->>UI: 200 run_id / transcript_text
+        UI->>UI: Cache text on run; RunDetail displays/copies/downloads verbatim
+    else Unknown/other-owner run or unavailable transcript
+        API-->>UI: 404 / 409 → display error
+    end
+
+    Note over User,Speech: PART 6 - Sign-out and shutdown
+    User->>UI: signOut(); confirm and abort any active upload
+    opt Active upload has a run ID
+        UI->>API: cancelUpload(id) before ending session
+        API->>DB: Persist cancellation if eligible
+        opt Cancellation persisted
+            API->>Storage: DELETE stored blob
+            Storage-->>API: Deleted/missing or service error
+        end
+        API-->>UI: Cancellation response
+    end
+    opt Cancellation succeeds or no active run
+        UI->>API: endSession() → POST /api/auth/sign-out
+        API->>API: sign_out(): revoke in-memory token; delete cookie
+        API-->>UI: 204
+        UI->>UI: setUser(null); resetWorkspace(); abort requests/clear protected state
+    end
+    Note over UI,API: Sign-out errors leave the session visible; aborted/stale requests cannot restore cleared data
+    Note over API,Worker: On API shutdown: set stop event; finish current run; await worker
 ```
 
-Production result URLs may point to Microsoft-managed storage; locally the Speech mock can serve them. Follow returned URLs/file-list pagination and refresh the listing if content links expire.
+## Source map
 
-Check individual file/report outcomes even when the overall status is Succeeded. Import readable speaker/timestamp text according to saved options. Commit transcript (`TEXT` locally, `NVARCHAR(MAX)` in Azure SQL) and completion atomically/idempotently. Retained raw JSON can be added later using Blob references in SQL.
+Line links identify the functions behind the diagram.
 
-### Exact Speech operations and triggers
+| Responsibility / functions | Source |
+|---|---|
+| Session restoration, `loadHistory`, navigation and workspace state | [App.tsx:20](../frontend/src/App.tsx#L20) |
+| `submitSignIn`, `beginUpload`, `cancel`, `signOut` | [App.tsx:149](../frontend/src/App.tsx#L149) |
+| `getCurrentUser`, `signIn`, `signOut` HTTP calls | [api/auth.ts:47](../frontend/src/api/auth.ts#L47) |
+| `listRecordings`, upload/transcript requests and XHR `putFile` | [api/recordings.ts:28](../frontend/src/api/recordings.ts#L28) |
+| `/api` proxy to :8000 | [vite.config.ts:10](../frontend/vite.config.ts#L10) |
+| App lifespan and worker startup/shutdown | [main.py:16](../backend/main.py#L16) |
+| `get_current_user`, `sign_in`, `me`, `sign_out` | [auth.py:29](../backend/api/auth.py#L29) |
+| `list_runs`, `get_transcript` routes | [runs.py:49](../backend/api/runs.py#L49) |
+| `authorize`, `complete`, `cancel`, `failed` routes | [uploads.py:45](../backend/api/uploads.py#L45) |
+| Owned reads, upload transitions and processing SQL helpers | [database.py:48](../backend/src/database.py#L48) |
+| `process_run`, `process_cycle`, `run_worker` | [processing.py:14](../backend/src/processing.py#L14) |
+| `submit`, `poll`, `transcript` HTTP calls and extraction | [speech_client.py:31](../backend/src/speech_client.py#L31) |
+| `blob_url`, `inspect_or_delete` | [storage_client.py:13](../backend/src/storage_client.py#L13) |
+| Streaming `put_blob`, `head_blob`, `delete_blob` | [storage_mock.py:61](../services/storage_mock.py#L61) |
+| Speech timers, result writing and submit/status/files routes | [speech_mock.py:78](../services/speech_mock.py#L78) |
+| Transcript display, copy and download | [RunDetail.tsx:7](../frontend/src/components/RunDetail.tsx#L7) |
 
-FastAPI background loops make these calls.
+## Planned live adapter
 
-| Operation | Method and path | Trigger / repeat rule |
-|---|---|---|
-| **Transcription - Submit** | `POST /speechtotext/transcriptions:submit?api-version=2024-11-15` | After a conditional SQL claim, initially or after explicit processing retry. Existing IDs resume monitoring. |
-| **Transcription - Get** | `GET /speechtotext/transcriptions/{id}?api-version=2024-11-15` | Scheduled due-job SQL scan. Startup resumes saved IDs. Stop polling terminal jobs. |
-| **Transcription - List Files** | `GET /speechtotext/transcriptions/{id}/files?api-version=2024-11-15` | After successful Get, or scheduled recovery of unfinished import. Follow returned `nextLink` as needed. |
-| **Result content download** | `GET {links.contentUrl}` | After List Files identifies needed entries, with bounded retries/recovery. |
-| **Transcription - Delete** (optional cleanup) | `DELETE /speechtotext/transcriptions/{id}?api-version=2024-11-15` | After durable import, if an agreed retention policy calls for explicit deletion; event-triggered or scheduled cleanup. |
+The application owns runs, state transitions and readable transcript storage. Azure Speech owns audio recognition. Preserve the current submit → status → List Files → content download boundary when replacing the mock.
 
-**Schedules:** ready-job scans, Speech status checks and browser polling run independently. Microsoft's batch guidance discourages polling more than once per minute per transcription. Persist due times and use bounded timeouts/backoff/jitter. Local mock timings can be accelerated. Browser polling reads SQL-backed state.
+Before live use, verify Microsoft's [submission contract](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/batch-transcription-create), [results contract](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/batch-transcription-get), [audio access](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/batch-transcription-audio-data) and [polling guidance](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/batch-transcription#best-practices-for-improving-performance). The local two-second cycle serves the timed mock; production polling must follow service guidance.
 
-## 4. History, details and processing retry
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant UI as React API client
-    participant API as FastAPI routes
-    participant DB as Application SQL
-
-    Note over UI,API: User: sign-in, History navigation or explicit refresh
-    UI->>API: GET /api/files
-    API->>DB: SELECT authorized runs/files/jobs including incomplete uploads
-    DB-->>API: Metadata, options and current states
-    API-->>UI: History DTOs with run metadata, options and state
-    Note over UI,API: Schedule: repeat while signed in with active runs, stop when none remain
-    UI->>API: GET /api/files
-    API->>DB: SELECT current states
-    API-->>UI: Updated History DTOs
-    Note over UI,API: User: opens details
-    UI->>API: GET /api/files/{file_id}
-    API->>DB: SELECT authorized metadata/options/state
-    API-->>UI: Detail DTO
-    Note over UI,API: After selected run is completed, including completion observed by UI polling
-    UI->>API: GET /api/files/{file_id}/transcript
-    API->>DB: SELECT stored readable transcript
-    API-->>UI: Transcript DTO
-    Note over UI,API: User: retries an eligible processing failure
-    UI->>API: POST /api/files/{file_id}/retry
-    API->>DB: Conditional transaction: preserve run/file/options and mark job ready for a new attempt
-    DB-->>API: Committed current state
-    API-->>UI: 202 queued, resume UI polling
-    Note over API,DB: Submission loop discovers the ready SQL job on its next scheduled scan
-```
-
-Retry preserves recording/options and starts a new submission attempt through diagram 2. Restart recovery resumes the existing attempt/ID. Interrupted uploads restart transfer with reselection as needed. Protect records with ownership checks and predictable errors. Frontend polling is proposed at three seconds with one request at a time and error backoff.
-
-## 5. Identity, cancellation, cleanup and execution lifecycle
-
-| Explicit operation | Caller → receiver | Trigger / data flow |
-|---|---|---|
-| Sign-in/token acquisition | React identity adapter → Entra ID | User signs in through the chosen identity library. Configure registration/scopes and credential transport to FastAPI. Session details remain open. |
-| Mock `POST /api/auth/sign-in` | React → FastAPI fixed-user adapter | Implemented: `{"access_key":"austin"}` or `{"access_key":"john"}` establishes an in-memory session identified by an HttpOnly cookie. |
-| Mock `GET /api/auth/me` | React → FastAPI | Implemented startup session restoration; returns `{id, name}` or 401. Recording ownership checks follow with SQL. |
-| Mock `POST /api/auth/sign-out` | React → FastAPI | Implemented local sign-out after handling active simulated transfer cancellation. Revoke the session and reset preview state. Future backend jobs continue independently. |
-| Credential and ownership validation | FastAPI middleware/dependencies | Every protected request validates credentials and record ownership. |
-| Cancel/report upload failure (route **TBD**) | React → FastAPI → SQL | User cancels, known transfer failure or sign-out during transfer. Abort transfer and persist cancelled/failed stage. Scheduled recovery covers interruptions missed by browser-close notifications. |
-| **Get Blob Properties** — `HEAD` object URL | FastAPI routes/recovery loop → Blob | After upload completion request, or scheduled safe reconciliation of stale uploads. Validate actual stored bytes before marking work ready. |
-| **Delete Blob** — `DELETE` object URL | FastAPI routes/cleanup loop → Blob | After cancellation/failure or scheduled orphan cleanup when safe. Local storage mock also owns partial-file cleanup. Preserve confirmed audio according to the retention policy. |
-| Stale-upload recovery | FastAPI recovery loop → SQL and Blob | Startup plus configurable periodic sweep. Inspect stale records, verify objects where needed and persist interrupted outcomes. Use evidence of inactivity to preserve healthy slow transfers. |
-| Resume submission/status/import work | FastAPI loops → SQL, Speech, result endpoint | Startup and scheduled due-row scans. Resume existing IDs/unfinished imports, recover known safe ready work, reconcile uncertain submissions. |
-| Retention cleanup | FastAPI cleanup loop → SQL/Blob/Speech | Configurable schedule after retention policy is agreed. Explicit Speech deletion follows durable import. |
-| `GET /api/health` | Developer/platform probe → FastAPI | On demand or configured health-probe schedule. Already implemented, independent of job coordination. |
-
-### Background-loop implementation contract
-
-- Use FastAPI **lifespan** to start/supervise loops and cancel/await them on shutdown. Persist scheduling/recovery state in SQL.
-- Initially run **one backend process, one Uvicorn worker and one App Service instance**. Use conditional claims and add SQL-backed leases/ownership before multiple workers or instances.
-- Keep requests short, use asynchronous HTTP and non-blocking waits, bounded concurrency/work per tick, and short task-scoped SQL sessions. Keep blocking SQL off the event loop as needed. Commit transactions before network calls.
-- Enable App Service **Always On** on a supported plan. Loops pause during restarts/deployments and resume from SQL on startup. Backend jobs continue while backend services run.
-- Test clean shutdown, task failures, overlapping scans, concurrent retries, lost Submit responses, uncertain claims, partial imports and restart recovery. Verify uncertain-submission reconciliation.
-
-## Local replacements and remaining decisions
-
-Local connected development uses Vite, **one main FastAPI process with loops/mock auth**, SQLite and separate storage/Speech HTTP mocks. Storage owns audio/partials, Speech owns simulated jobs/results, and main FastAPI owns application SQL.
-
-The [local plan](IMPLEMENTATION_PLAN.md) defines local sessions, cancellation, proposed mock ports and recovery behavior. Remaining decisions include connected size/duration/options policy, configured recovery intervals and production credentials/source authorization/retention. Configure production managed identities/RBAC and monitoring during deployment.
-
-See [service ownership and deployment contract](IMPLEMENTATION_PLAN.md#service-boundaries-local-now-azure-later) and [application API requirements](REQUIREMENTS.md#api-and-authentication). Speech references: [submit](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/batch-transcription-create), [retrieve results](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/batch-transcription-get), [audio access](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/batch-transcription-audio-data), [polling guidance](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/batch-transcription#best-practices-for-improving-performance).
+API version, source authorization, supported input/options, output formatting, worker hosting, retention and production identity integration remain open. Manual retry/reconciliation and automatic frontend refresh are planned; no retry route or browser polling exists in the current flow.

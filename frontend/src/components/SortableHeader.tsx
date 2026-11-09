@@ -1,17 +1,21 @@
-import type { HistoryViewState } from '../history'
-import { Icon } from './Icon'
+import type { ReactElement } from 'react'
+import type { HistoryViewState } from '../history.ts'
+import { Icon } from './Icon.tsx'
 
-export function SortableHeader({ label, direction, onSort }: {
+const sortIcons = { none: 'sort', ascending: 'arrow-up', descending: 'arrow-down' } as const
+
+type SortableHeaderProps = {
   label: string
   direction: HistoryViewState['sort']['direction'] | 'none'
   onSort: () => void
-}) {
-  const icon = direction === 'none' ? 'sort' : direction === 'ascending' ? 'arrow-up' : 'arrow-down'
+}
+
+export function SortableHeader({ label, direction, onSort }: SortableHeaderProps): ReactElement {
   return (
     <th scope="col" aria-sort={direction}>
       <button className="sort-button" onClick={onSort}>
         {label}
-        <span aria-hidden="true"><Icon name={icon} size={14} /></span>
+        <span aria-hidden="true"><Icon name={sortIcons[direction]} size={14} /></span>
       </button>
     </th>
   )

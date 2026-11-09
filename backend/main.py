@@ -15,13 +15,11 @@ from api.uploads import router as uploads_router
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     stop = threading.Event()
-    wake = asyncio.Event()
-    worker = asyncio.create_task(processing.run_worker(app.state.database_path, stop, wake))
+    worker = asyncio.create_task(asyncio.to_thread(processing.run_worker, app.state.database_path, stop))
     try:
         yield
     finally:
         stop.set()
-        wake.set()
         await worker
 
 

@@ -1,23 +1,23 @@
-import { version as APP_VERSION } from '../package.json'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { FormEvent } from 'react'
-import { getCurrentUser, signIn, signOut as endSession } from './api/auth'
-import type { User } from './api/auth'
-import { Brand } from './components/Brand'
-import { EmptyState } from './components/EmptyState'
-import { Icon } from './components/Icon'
-import { RunDetail } from './components/RunDetail'
-import { UploadPage } from './components/UploadPage'
-import { authorizeUpload, cancelUpload, completeUpload, failUpload, getTranscript, listRecordings, putFile } from './api/recordings'
-import type { UploadSettings } from './api/recordings'
-import type { Run, UploadProgress } from './run'
-import { initialHistoryView } from './history'
-import { HistoryPage } from './components/HistoryPage'
-import { SignInForm } from './components/SignInForm'
+import type { FormEvent, ReactNode } from 'react'
+import { version as APP_VERSION } from '../package.json'
+import { getCurrentUser, signIn, signOut as endSession } from './api/auth.ts'
+import type { User } from './api/auth.ts'
+import { authorizeUpload, cancelUpload, completeUpload, failUpload, getTranscript, listRecordings, putFile } from './api/recordings.ts'
+import type { UploadSettings } from './api/recordings.ts'
+import { Brand } from './components/Brand.tsx'
+import { EmptyState } from './components/EmptyState.tsx'
+import { HistoryPage } from './components/HistoryPage.tsx'
+import { Icon } from './components/Icon.tsx'
+import { RunDetail } from './components/RunDetail.tsx'
+import { SignInForm } from './components/SignInForm.tsx'
+import { UploadPage } from './components/UploadPage.tsx'
+import { initialHistoryView } from './history.ts'
+import type { Run, UploadProgress } from './run.ts'
 import './App.css'
 
 type Page = 'history' | 'upload' | 'detail'
-function App() {
+function App(): ReactNode {
   const [darkMode, setDarkMode] = useState(() => {
     try {
       const saved = localStorage.getItem('ssscribe-theme')
@@ -53,7 +53,7 @@ function App() {
   const [dataLoading, setDataLoading] = useState(true)
   const [dataError, setDataError] = useState('')
 
-  const loadHistory = useCallback(async () => {
+  const loadHistory = useCallback(async (): Promise<void> => {
     historyRequest.current?.abort()
     const controller = new AbortController()
     historyRequest.current = controller
@@ -120,18 +120,18 @@ function App() {
     return () => window.removeEventListener('beforeunload', warn)
   }, [uploadInProgress])
 
-  function refreshHistory() {
+  function refreshHistory(): void {
     setDataLoading(true)
     setDataError('')
     void loadHistory()
   }
-  function navigate(next: Page) {
+  function navigate(next: Page): void {
     setPage(next)
     setNotice('')
     setDataError('')
     if (next === 'history') refreshHistory()
   }
-  function resetWorkspace() {
+  function resetWorkspace(): void {
     session.current += 1
     historyRequest.current?.abort()
     upload?.controller.abort()
@@ -146,7 +146,7 @@ function App() {
     setAccessKey('')
     setAuthError('')
   }
-  async function submitSignIn(event: FormEvent<HTMLFormElement>) {
+  async function submitSignIn(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault()
     if (authBusy) return
     setAuthBusy(true)
@@ -162,10 +162,10 @@ function App() {
       setAuthBusy(false)
     }
   }
-  function saveRun(run: Run) {
+  function saveRun(run: Run): void {
     setRuns((current) => [run, ...current.filter((item) => item.run_id !== run.run_id)])
   }
-  async function beginUpload(file: File, settings: UploadSettings) {
+  async function beginUpload(file: File, settings: UploadSettings): Promise<void> {
     if (upload || !user || authBusy) return
     const controller = new AbortController()
     const signal = controller.signal
@@ -175,15 +175,15 @@ function App() {
     setUpload({ controller, run_id: null, progress: 0 })
     setNotice('Creating your upload record…')
     try {
-      const authorization = await authorizeUpload(file, settings, signal)
+      const { run, upload_url, headers } = await authorizeUpload(file, settings, signal)
       if (signal.aborted || generation !== session.current) return
-      id = authorization.run.run_id
+      id = run.run_id
       setUpload({ controller, run_id: id, progress: 0 })
-      saveRun(authorization.run)
+      saveRun(run)
       setPage('history')
       refreshHistory()
       setNotice('Uploading to local storage…')
-      await putFile(file, authorization.upload_url, authorization.headers, signal, (progress) => {
+      await putFile(file, upload_url, headers, signal, (progress) => {
         if (!signal.aborted && generation === session.current)
           setUpload({ controller, run_id: id, progress })
       })
@@ -207,7 +207,7 @@ function App() {
       }
     }
   }
-  async function cancel(id: number) {
+  async function cancel(id: number): Promise<void> {
     if (!window.confirm('Cancel this upload? Select the file again to start a new run.')) return
     const generation = session.current
     if (upload?.run_id === id) upload.controller.abort()
@@ -223,13 +223,13 @@ function App() {
       if (generation === session.current) refreshHistory()
     }
   }
-  async function signOut() {
+  async function signOut(): Promise<void> {
     if (authBusy) return
     if (upload && !window.confirm('Stop the active upload and sign out?')) return
     setAuthBusy(true)
     upload?.controller.abort()
     try {
-      if (upload?.run_id !== null && upload?.run_id !== undefined) await cancelUpload(upload.run_id)
+      if (upload && upload.run_id !== null) await cancelUpload(upload.run_id)
       await endSession()
       setUser(null)
       resetWorkspace()
@@ -239,6 +239,45 @@ function App() {
     } finally {
       setAuthBusy(false)
     }
+  }
+
+  function renderPage(): ReactNode {
+    if (page === 'upload') return <UploadPage onBegin={beginUpload} busy={upload !== null || authBusy} />
+    if (page === 'history') return (
+      <HistoryPage
+        runs={runs}
+        view={historyView}
+        onViewChange={setHistoryView}
+        onUpload={() => navigate('upload')}
+        onRefresh={refreshHistory}
+        onOpen={(id) => {
+          setSelected(id)
+          navigate('detail')
+        }}
+        upload={upload}
+        onCancel={cancel}
+      />
+    )
+    if (!selectedRun) return (
+      <EmptyState
+        title="Run not found"
+        action={
+          <button className="button secondary" onClick={() => navigate('history')}>Back to History</button>
+        }
+      >
+        This recording is not available for the current user.
+      </EmptyState>
+    )
+    if (selectedRun.transcription_stage === 'completed' && selectedRun.transcript === undefined)
+      return <p role="status">Loading stored transcript…</p>
+    return (
+      <RunDetail
+        run={selectedRun}
+        onBack={() => navigate('history')}
+        progress={upload?.run_id === selectedRun.run_id ? upload.progress : undefined}
+        onCancel={() => cancel(selectedRun.run_id)}
+      />
+    )
   }
   return (
     <>
@@ -328,48 +367,7 @@ function App() {
             </div>
             {dataError && <div role="alert">{dataError} <button className="button secondary" onClick={refreshHistory}>Refresh</button></div>}
             {dataLoading && <p role="status">Loading saved recordings…</p>}
-            {page === 'upload' ? (
-              <UploadPage onBegin={beginUpload} busy={upload !== null || authBusy} />
-            ) : page === 'detail' ? (
-              selectedRun?.transcription_stage === 'completed' && selectedRun.transcript === undefined ? (
-                <p role="status">Loading stored transcript…</p>
-              ) : selectedRun ? (
-                <RunDetail
-                  run={selectedRun}
-                  onBack={() => navigate('history')}
-                  progress={upload?.run_id === selectedRun.run_id ? upload.progress : undefined}
-                  onCancel={() => cancel(selectedRun.run_id)}
-                />
-              ) : (
-                <EmptyState
-                  title="Run not found"
-                  action={
-                    <button
-                      className="button secondary"
-                      onClick={() => navigate('history')}
-                    >
-                      Back to History
-                    </button>
-                  }
-                >
-                  This recording is not available for the current user.
-                </EmptyState>
-              )
-            ) : (
-              <HistoryPage
-                runs={runs}
-                view={historyView}
-                onViewChange={setHistoryView}
-                onUpload={() => navigate('upload')}
-                onRefresh={refreshHistory}
-                onOpen={(id) => {
-                  setSelected(id)
-                  navigate('detail')
-                }}
-                upload={upload}
-                onCancel={cancel}
-              />
-            )}
+            {renderPage()}
             <footer className="page-footer">
               <span>SSScribe version {APP_VERSION} · Development</span>
             </footer>

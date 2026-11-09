@@ -7,8 +7,8 @@ SSScribe is a local transcription workspace with Austin/John sign-in, persistent
 - [Project structure](docs/PROJECT_STRUCTURE.md): maintained files, responsibilities and editing guide.
 - [Frontend guide](frontend/README.md): controls, scenarios, manual review and the [source layout](frontend/README.md#source-layout).
 - [Requirements](docs/REQUIREMENTS.md): current coverage and acceptance criteria.
-- [Architecture and end-state plan](docs/IMPLEMENTATION_PLAN.md): service boundaries, Azure deployment and architecture diagrams.
-- [API and data flow](docs/API_DATA_FLOW.md): ordered calls, Speech operation names, triggers and schedules.
+- [Implementation plan](docs/IMPLEMENTATION_PLAN.md): local implementation matrix, Azure equivalents and remaining work.
+- [API and data flow](docs/API_DATA_FLOW.md): current calls from session restoration through transcript import.
 - [UI research](docs/UI_RESEARCH.md): product references and design rationale.
 - [Agent instructions](AGENTS.md): implementation and documentation guidelines.
 
@@ -16,7 +16,7 @@ SSScribe is a local transcription workspace with Austin/John sign-in, persistent
 
 - Austin/John sign-in, session restoration, navy accents and light/dark themes.
 - Non-empty TXT mock files up to **1,000,000 bytes inclusive**; saved English, Automatic/1–10 speakers, labels and timestamp options.
-- Begin upload persists a run, sends bytes directly to storage with measured progress, then verifies stored size and marks the upload completed; transcription remains not started. Navigation preserves the transfer.
+- Begin upload persists a run, sends bytes directly to storage with measured progress, then verifies stored size. The worker submits completed uploads to Speech and imports results. Navigation preserves the transfer.
 - History reads only the signed-in user's SQLite records, with filename search, sorting, pagination, Refresh and details. Reload and API restart preserve records; API restart requires signing in again.
 - Cancel aborts the local transfer and persists cancellation. An interrupted or unconfirmed upload requires file reselection and a new submission.
 - Stored completed transcripts, when present, are fetched separately and displayed/copied/downloaded verbatim. Refresh History to see backend processing updates and open completed transcripts.
@@ -105,7 +105,7 @@ Completion and cancellation use conditional SQL updates, so cancelled uploads ca
 
 ### Connected Speech processing
 
-FastAPI starts one background worker through its lifespan. Each cycle handles every selected run in run-ID order: submit completed uploads with not-started transcription and no job ID, poll saved active jobs, then import succeeded results. Runs are processed individually and the worker waits two seconds between cycles. SQL connections close before HTTP calls; HTTP work runs off the API event loop. Shutdown stops after the current run.
+FastAPI's lifespan starts one background thread. Its ordinary loop submits completed uploads, polls saved jobs and imports succeeded results, one run at a time in run-ID order. A stop event waits two seconds between cycles and wakes on shutdown. SQL connections close before HTTP calls. Shutdown finishes the current run and stops before the next one.
 
 Set `SSSCRIBE_SPEECH_URL` on the **API process** to change the default `http://127.0.0.1:8002`. The worker submits `data/blobs/audio/<original filename>` and writes results under `data/blobs/transcripts/<job-id>/`. Storage and Speech must share that local source directory; a custom storage directory must be mirrored in the Speech mock's filesystem. The mock uses the saved language and source text; speaker/label/timestamp options remain saved metadata.
 

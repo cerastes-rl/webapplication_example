@@ -1,6 +1,5 @@
 """One sequential submission, polling and import cycle for persisted runs."""
 
-import asyncio
 import logging
 import threading
 from pathlib import Path
@@ -19,15 +18,15 @@ def process_run(path: Path, run: dict, phase: str) -> None:
             if not database.claim_submission(path, run_id):
                 return
             job_id, job = speech_client.submit(run)
-            raw, stage, error = speech_client.status(job)
-            database.save_speech_status(path, run_id, job_id, raw, stage, error)
         elif phase == 'poll':
-            job = speech_client.poll(run['speech_job_id'])
-            raw, stage, error = speech_client.status(job)
-            database.save_speech_status(path, run_id, run['speech_job_id'], raw, stage, error)
+            job_id = run['speech_job_id']
+            job = speech_client.poll(job_id)
         else:
             text = speech_client.transcript(run['speech_job_id'])
             database.save_transcript(path, run_id, text)
+            return
+        raw, stage, error = speech_client.status(job)
+        database.save_speech_status(path, run_id, job_id, raw, stage, error)
     except Exception as error:
         logger.warning('Speech %s failed for run %s: %s', phase, run_id, error)
         stage = None
@@ -57,15 +56,11 @@ def process_cycle(path: Path, stop: threading.Event) -> None:
                 logger.exception('Could not persist Speech %s for run %s', phase, run['run_id'])
 
 
-async def run_worker(path: Path, stop: threading.Event, wake: asyncio.Event) -> None:
+def run_worker(path: Path, stop: threading.Event) -> None:
     while not stop.is_set():
         try:
-            await asyncio.to_thread(process_cycle, path, stop)
+            process_cycle(path, stop)
         except Exception:
             # Missing/uninitialized databases stay explicit setup errors, never create files.
             logger.exception('Speech processing cycle failed')
-        if not stop.is_set():
-            try:
-                await asyncio.wait_for(wake.wait(), timeout=INTERVAL_SECONDS)
-            except TimeoutError:
-                pass
+        stop.wait(INTERVAL_SECONDS)

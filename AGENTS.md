@@ -17,10 +17,10 @@ Build a working local mock of an authenticated speech-to-text application. Prior
 
 ## Current milestone
 
-The local upload slice is connected through queued state. UI/auth review was approved on 2026-11-09; connected browser/accessibility and responsive review remain pending.
+The local upload-to-transcript flow is connected through Speech submission, polling and result import. UI/auth review was approved on 2026-11-09; connected browser/accessibility and responsive review remain pending.
 
 - `App.tsx` owns navigation, session state, API-backed History and one active-upload object. `run.ts` uses the API's fields and numeric run IDs directly; `history.ts` owns frontend search/sort/page preferences. Components stay one file per component; clients stay under `src/api/`.
-- Connected uploads accept non-empty TXT up to **1,000,000 bytes inclusive**, English, Automatic/1–10 speakers, labels/timestamps default on. Begin upload creates a row, PUTs bytes directly to storage and POSTs completion; the API HEAD-verifies bytes before queuing.
+- Connected uploads accept non-empty TXT up to **1,000,000 bytes inclusive**, English, Automatic/1–10 speakers, labels/timestamps default on. Begin upload creates a row, PUTs bytes directly to storage and POSTs completion; the API HEAD-verifies bytes before the worker submits to Speech. Speaker/label/timestamp settings are saved metadata.
 - `GET /api/runs` returns all owned rows; frontend controls pagination. Load History after sign-in/session restoration, on entering History, after mutations and on Refresh. Opening Upload/details should not reload the whole list.
 - Failed/interrupted uploads require reselection and a new submission. Cancellation aborts the local transfer and conditionally persists cancellation before DELETE. No preview fixtures, Check upload controls, fake attempt counters, request IDs, deduplication indexes or automatic creation retries.
 - The single runs table stores `upload_stage` and `transcription_stage`. Initialize it explicitly through `backend/src/database.py` or the retained VS Code task. FastAPI must not initialize or upgrade it; no automatic legacy-schema conversion.
@@ -30,7 +30,7 @@ The local upload slice is connected through queued state. UI/auth review was app
 
 ## Planned connected architecture
 
-The single [implementation plan](docs/IMPLEMENTATION_PLAN.md) separates current behavior from the next Speech integration slice and production direction. Add processing functions only when requested. Preserve service boundaries and use short SQL operations separate from HTTP calls. The simple storage interface cannot fence a late PUT; automatic orphan cleanup remains deferred.
+The single [implementation plan](docs/IMPLEMENTATION_PLAN.md) separates current behavior, remaining local work and production direction. Keep the existing sequential processing worker minimal. Preserve service boundaries and use short SQL operations separate from HTTP calls. The simple storage interface cannot fence a late PUT; automatic orphan cleanup remains deferred.
 
 ## Sequence diagrams and explanations
 

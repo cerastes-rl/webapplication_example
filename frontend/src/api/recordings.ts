@@ -29,8 +29,10 @@ export function listRecordings(signal?: AbortSignal): Promise<Run[]> {
   return request<Run[]>('runs', undefined, signal)
 }
 
-export async function authorizeUpload(file: File, settings: UploadSettings, signal: AbortSignal) {
-  return request<{ run: Run; upload_url: string; headers: Record<string, string> }>(
+export function authorizeUpload(
+  file: File, settings: UploadSettings, signal: AbortSignal
+): Promise<{ run: Run; upload_url: string; headers: Record<string, string> }> {
+  return request(
     'uploads/authorize', { filename: file.name, size_bytes: file.size, ...settings }, signal
   )
 }

@@ -19,14 +19,14 @@ export interface Run {
 
 export type UploadProgress = { run_id: number | null; progress: number }
 
-export function formatSize(bytes: number | null) {
+export function formatSize(bytes: number | null): string {
   if (bytes === null) return 'Unknown'
   return bytes >= 1_000_000_000
     ? `${(bytes / 1_000_000_000).toFixed(1)} GB`
     : `${(bytes / 1_000_000).toFixed(1)} MB`
 }
 
-export function formatDate(date: string) {
+export function formatDate(date: string): string {
   return new Intl.DateTimeFormat(undefined, {
     year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
   }).format(new Date(date))
