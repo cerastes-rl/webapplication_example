@@ -1,8 +1,8 @@
 .topbar { height: 80px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 32px; position: sticky; top: 0; z-index: 10; gap: 16px; }
 .brand { display: flex; align-items: center; gap: 11px; font-size: 24px; letter-spacing: -.9px; font-weight: 750; color: var(--text); }
 .wordmark { display: inline-block; white-space: nowrap; }
-.wordmark em { font-style: italic; }
-.wordmark-pencil { display: inline-block; width: .32em; height: .9em; margin: 0 .015em; vertical-align: -.06em; transform: skewX(-12deg); overflow: visible; }
+.wordmark em { font-style: italic; letter-spacing: normal; }
+.wordmark-pencil { display: inline-block; width: .32em; height: .9em; margin: 0 .025em; vertical-align: -.06em; transform: skewX(-12deg); overflow: visible; }
 .brand-mark { width: 34px; height: 36px; border-radius: 9px; background: var(--tint); display: flex; align-items: center; justify-content: center; gap: 3px; }
 .brand-mark i { width: 3px; background: var(--accent-ink); border-radius: 3px; height: 13px; }
 .brand-mark i:nth-child(2), .brand-mark i:nth-child(4) { height: 21px; }
