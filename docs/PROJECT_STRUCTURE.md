@@ -1,4 +1,4 @@
-# SSScribe project structure
+# OIGScribe project structure
 
 See [README](../README.md) for commands, [requirements](REQUIREMENTS.md) for acceptance and the [implementation matrix](IMPLEMENTATION_PLAN.md#local-implementation-matrix) for current features, Azure equivalents and next work.
 
@@ -46,7 +46,7 @@ frontend/
 .devcontainer/               Shared development environment and port forwarding
 ```
 
-`components/` contains `Brand`, `Icon`, `EmptyState`, `SignInForm`, `UploadPage`, `HistoryPage`, `RunDetail`, `StatusBadge` and `SortableHeader`. Keep the layout shallow and import components directly. See the [frontend source layout](../frontend/README.md#source-layout).
+`components/` contains `Brand`, `Wordmark`, `Icon`, `EmptyState`, `SignInForm`, `UploadPage`, `HistoryPage`, `RunDetail`, `StatusBadge` and `SortableHeader`. Keep the layout shallow and import components directly. See the [frontend source layout](../frontend/README.md#source-layout).
 
 ## Current request flow
 

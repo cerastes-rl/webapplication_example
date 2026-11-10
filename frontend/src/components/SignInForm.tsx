@@ -1,5 +1,6 @@
 import type { FormEvent } from 'react'
 import { Icon } from './Icon'
+import { Wordmark } from './Wordmark'
 
 type SignInFormProps = {
   accessKey: string
@@ -20,7 +21,7 @@ export function SignInForm({
 }: SignInFormProps) {
   return (
     <div className="panel signin-card">
-      <h1>SSScribe</h1>
+      <h1><Wordmark /></h1>
       <p>
         An application to upload user recordings, track transcription progress, and view transcripts.
       </p>

@@ -1,6 +1,8 @@
-# SSScribe — Transcription workspace
+# OIGScribe — Transcription workspace
 
-SSScribe is a local transcription workspace with Austin/John sign-in, persistent user-owned History and direct text-file uploads to a standalone storage mock. Runs and options live in SQLite; file bytes live on disk. A backend worker submits uploads to the Speech mock, polls jobs and imports readable transcripts. Theme preference persists in localStorage.
+The OIGScribe wordmark uses italic “Scribe” with a pencil replacing its “i”.
+
+OIGScribe is a local transcription workspace with Austin/John sign-in, persistent user-owned History and direct text-file uploads to a standalone storage mock. Runs and options live in SQLite; file bytes live on disk. A backend worker submits uploads to the Speech mock, polls jobs and imports readable transcripts. Theme preference persists in localStorage.
 
 ## Documentation
 

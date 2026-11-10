@@ -1,4 +1,4 @@
-# SSScribe frontend
+# OIGScribe frontend
 
 React + TypeScript + Vite, plain CSS and Oxlint. Auth and user-owned History use FastAPI/SQLite. File bytes upload directly to the standalone storage mock. The backend submits completed uploads to Speech, polls jobs and imports transcripts. Refresh History to see changes.
 

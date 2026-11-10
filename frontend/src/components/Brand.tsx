@@ -1,3 +1,5 @@
+import { Wordmark } from './Wordmark'
+
 export function Brand() {
   return (
     <div className="brand">
@@ -8,9 +10,7 @@ export function Brand() {
         <i />
         <i />
       </span>
-      <span>
-        SSScribe<span className="brand-dot">.</span>
-      </span>
+      <Wordmark />
     </div>
   )
 }

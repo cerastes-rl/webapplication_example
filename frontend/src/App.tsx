@@ -365,7 +365,7 @@ function App(): ReactNode {
             <div className="sidebar-bottom">
               <span className="local-dot" /> Built for local exploration
               <p>Files and run history are saved by the local services.</p>
-              <span className="version">SSScribe / {APP_VERSION}</span>
+              <span className="version">OIGScribe / {APP_VERSION}</span>
             </div>
           </aside>
           <main className="main-content" id="main" ref={main} tabIndex={-1}>
@@ -373,7 +373,7 @@ function App(): ReactNode {
             {dataError && <div role="alert">{dataError} {page !== 'history' && <button className="button secondary" onClick={refreshHistory}>Refresh</button>}</div>}
             {renderPage()}
             <footer className="page-footer">
-              <span>SSScribe version {APP_VERSION} · Development</span>
+              <span>OIGScribe version {APP_VERSION} · Development</span>
             </footer>
           </main>
         </div>
