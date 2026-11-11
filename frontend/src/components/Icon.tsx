@@ -19,12 +19,7 @@ const paths = {
       <path d="M14 3v5h5M9 13v3m3-5v7m3-5v3" />
     </>
   ),
-  'circle-arrow': (
-    <>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M8 12h8m-4-4 4 4-4 4" />
-    </>
-  ),
+  reset: <path d="M3 11a9 9 0 1 1 2.5 7M3 4v7h7" />,
   sort: <path d="M8 19V5m-4 4 4-4 4 4m4-4v14m-4-4 4 4 4-4" />,
   'arrow-up': <path d="M12 19V5m-6 6 6-6 6 6" />,
   'arrow-down': <path d="M12 5v14m-6-6 6 6 6-6" />,

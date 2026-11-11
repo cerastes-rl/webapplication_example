@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import type { ReactElement } from 'react'
-import type { HistoryViewState } from '../history.ts'
+import { matchesHistoryFilter } from '../history.ts'
+import type { HistoryFilter, HistoryViewState } from '../history.ts'
 import { formatDate, formatSize } from '../run.ts'
 import type { Run, UploadProgress } from '../run.ts'
 import { EmptyState } from './EmptyState.tsx'
@@ -34,7 +35,7 @@ export function HistoryPage({
   onCancel
 }: HistoryPageProps): ReactElement {
   const searchInput = useRef<HTMLInputElement>(null)
-  const { search, pageSize, page, sort } = view
+  const { search, pageSize, page, sort, filter } = view
   function changeSort(column: 'created' | 'size') {
     onViewChange({
       ...view,
@@ -48,7 +49,7 @@ export function HistoryPage({
     })
   }
   const query = search.trim().toLowerCase()
-  const matchingRuns = runs.filter((run) => run.filename.toLowerCase().includes(query)).sort((a, b) => {
+  const matchingRuns = runs.filter((run) => run.filename.toLowerCase().includes(query) && matchesHistoryFilter(run, filter)).sort((a, b) => {
     const difference = sort.column === 'created'
       ? Date.parse(a.created_at) - Date.parse(b.created_at)
       : (a.size_bytes ?? 0) - (b.size_bytes ?? 0)
@@ -59,14 +60,14 @@ export function HistoryPage({
   const currentPage = Math.min(page, pageCount)
   const start = (currentPage - 1) * pageSize
   const visibleRuns = matchingRuns.slice(start, start + pageSize)
-  const completed = runs.filter((run) => run.transcription_stage === 'completed').length
-  const inProgress = runs.filter((run) => run.upload_stage === 'uploading' || ['queued', 'running', 'importing'].includes(run.transcription_stage)).length
+  const completed = runs.filter((run) => matchesHistoryFilter(run, 'completed')).length
+  const inProgress = runs.filter((run) => matchesHistoryFilter(run, 'in_progress')).length
 
   return (
     <>
       <div className="page-heading">
         <div>
-          <h1>Recording history</h1>
+          <h1>Your Transcriptions</h1>
           <p>Track recording uploads, transcription progress and completed transcripts.</p>
         </div>
         <div className="history-actions">
@@ -81,26 +82,7 @@ export function HistoryPage({
           </button>
         </div>
       </div>
-      <div className="stats-grid">
-        <div className="stat-card">
-          <span>Total recordings</span>
-          <strong>{runs.length.toString().padStart(2, '0')}</strong>
-        </div>
-        <div className="stat-card">
-          <span>Ready to read</span>
-          <strong>
-            {completed.toString().padStart(2, '0')}
-            <span className="stat-indicator">
-              <Icon name="check" size={18} />
-            </span>
-          </strong>
-        </div>
-        <div className="stat-card">
-          <span>In progress</span>
-          <strong>{inProgress.toString().padStart(2, '0')}</strong>
-        </div>
-      </div>
-      <section className="panel history-panel" aria-label="Recording history">
+      <section className="panel history-panel" aria-label="Your Transcriptions">
         <div className="table-toolbar">
           <div className="table-heading-controls">
             <div className="history-search">
@@ -125,15 +107,26 @@ export function HistoryPage({
                     searchInput.current?.focus()
                   }}
                 >
-                  <Icon name="circle-arrow" size={18} />
+                  <Icon name="reset" size={18} />
                 </button>
               )}
             </div>
-            <div>
-              <h2>
-                {query ? 'Filtered recordings' : 'All recordings'} <span>{matchingRuns.length}</span>
-              </h2>
-              <p>Open a run for its settings and transcript.</p>
+            <div className="history-filters" role="group" aria-label="Filter recordings by status">
+              {([
+                ['all', 'All recordings', runs.length],
+                ['completed', 'Ready to read', completed],
+                ['in_progress', 'In progress', inProgress]
+              ] satisfies [HistoryFilter, string, number][]).map(([value, label, count]) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={`button ${filter === value ? 'primary' : 'secondary'} history-filter`}
+                  aria-pressed={filter === value}
+                  onClick={() => onViewChange({ ...view, filter: value, page: 1 })}
+                >
+                  {label} <span>{count}</span>
+                </button>
+              ))}
             </div>
           </div>
           <div className="table-pagination">
@@ -153,7 +146,7 @@ export function HistoryPage({
             <span role="status">
               {matchingRuns.length === 0 ? 0 : start + 1}–{Math.min(start + pageSize, matchingRuns.length)} of {matchingRuns.length}
             </span>
-            <nav className="pagination-controls" aria-label="Recording history pages">
+            <nav className="pagination-controls" aria-label="Your Transcriptions pages">
               <button
                 className="button secondary history-action"
                 disabled={currentPage === 1}
@@ -189,13 +182,13 @@ export function HistoryPage({
             title="No matching recordings"
             action={
               <button className="button secondary" onClick={() => {
-                onViewChange({ ...view, search: '', page: 1 })
+                onViewChange({ ...view, search: '', filter: 'all', page: 1 })
               }}>
-                Clear search
+                Clear filters
               </button>
             }
           >
-            Try another filename or clear the search.
+            Try another filename or clear the filters.
           </EmptyState>
         )}
         {matchingRuns.length > 0 && (

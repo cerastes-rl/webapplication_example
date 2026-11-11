@@ -18,8 +18,8 @@ Start the [API](../README.md#run-the-api) , [storage mock](../README.md#run-the-
 - TXT files, greater than zero and at most **1,000,000 bytes inclusive**. English; Automatic or 1–10 speakers; labels/timestamps default on. Options are saved for later processing.
 - Upload controls use audio terminology and display a 1 GB limit. The local mock still accepts only non-empty TXT fixtures up to 1,000,000 bytes inclusive, with generic format/size validation messages.
 - Begin upload creates a run, opens History, PUTs the File directly to storage via XHR, reports measured progress and HEAD-verifies completion through the API. The shell owns the request across internal navigation; a second transfer is disabled while one is active.
-- History shows refresh progress to the left of Refresh while loading. Upload progress appears in the top banner with a reminder to keep the application open, and disappears when the upload ends. Upload errors and cancellation notices remain beside Refresh.
-- History supports search, sorting, 10/25/50-row pages and Refresh. It loads on sign-in, entering History, after mutations and on Refresh; backend processing runs independently; automatic frontend refresh is deferred.
+- History shows refresh progress to the left of Refresh while loading. Upload progress and transcription status appear in the Transcriptions table. Upload errors and cancellation notices remain beside Refresh.
+- History supports compact status filter buttons (All recordings, Ready to read and In progress), filename search, sorting, 10/25/50-row pages and Refresh. It loads on sign-in, entering History, after mutations and on Refresh; backend processing runs independently; automatic frontend refresh is deferred.
 - An inactive uploading/failed run offers Cancel. Restarting a transfer requires file reselection and a new submission. Partial uploads do not resume.
 - Sign-out confirms stopping an active transfer and requests cancellation before ending the session. Errors remain visible for retry. Browser reload warns during an active transfer; after reload the saved row remains in History and can be cancelled.
 - Details show saved options and application state. Existing completed transcripts are fetched separately; display, Copy and Download use the identical stored text. Processing retry is deferred.
@@ -47,9 +47,12 @@ Node's built-in test runner covers auth, metadata contracts, whole-list reads, u
 |---|---|
 | [src/main.tsx](src/main.tsx) | React entry point. |
 | [src/App.tsx](src/App.tsx) | Shell, auth, navigation, API-backed History and shell-owned transfer lifetime. |
+| [src/DefaultLayout.tsx](src/DefaultLayout.tsx) | Shared screen structure: banner, sidebar, inline page footer, skip link and content containers. Apps supply their content and actions. |
+| [src/components/TopBanner.tsx](src/components/TopBanner.tsx) | Shared banner with private theme-toggle logic, user identity and sign-out controls. Styles live in `DefaultStyle.css`. |
+| [src/components/Sidebar.tsx](src/components/Sidebar.tsx) | Shared navigation container and sidebar footer information. |
 | [src/components/SignInForm.tsx](src/components/SignInForm.tsx) | Sign-in form, session-check message and auth feedback. |
 | [src/components/SortableHeader.tsx](src/components/SortableHeader.tsx) | Shared sortable table heading. |
-| [src/components/HistoryPage.tsx](src/components/HistoryPage.tsx) | History table, summary counts, upload/transcription statuses and action buttons. |
+| [src/components/HistoryPage.tsx](src/components/HistoryPage.tsx) | History table, status filter buttons with counts, upload/transcription statuses and action buttons. |
 | [src/components/UploadPage.tsx](src/components/UploadPage.tsx) | File picker, options and upload form validation. |
 | [src/components/RunDetail.tsx](src/components/RunDetail.tsx) | Run information and stored transcript. |
 | `src/components/Icon.tsx`, `Brand.tsx`, `StatusBadge.tsx`, `EmptyState.tsx` | Shared UI components. |
@@ -58,12 +61,30 @@ Node's built-in test runner covers auth, metadata contracts, whole-list reads, u
 | [package.json](package.json) | Dependencies, scripts and the version displayed in the footer/sidebar. |
 | [src/run.ts](src/run.ts) | Run contract, upload limit, date/size formatting and direct upload/transcription stages. |
 | [src/history.ts](src/history.ts) | History view preferences and defaults. |
-| `src/App.css`, `src/index.css` | Component styles and global theme tokens. |
+| [src/DefaultStyle.css](src/DefaultStyle.css) | Shared design styles for reuse across apps: themes, typography, controls, navigation and shell, including responsive rules. |
+| [src/App.css](src/App.css) | OIGScribe-specific recording, upload and transcript layouts. |
 
-Keep one component per file in `src/components/` and import components directly. The folder stays shallow while the app is small.
+Group small private components and behavior with their parent reusable unit; multiple related components may share a file. Keep independently reused or substantial components separate, use direct imports and keep the folder structure shallow. See the [shared frontend template conventions](../AGENTS.md#shared-frontend-template).
 
 `App.tsx` keeps shared state and event handlers; the screen components receive values and callbacks through props.
 
 Sign-in follows `SignInForm.onSubmit` → `App.submitSignIn()` → `api/auth.signIn()` → Python `auth.sign_in()`.
 
 The [local implementation plan](../docs/IMPLEMENTATION_PLAN.md) describes implemented uploads/Speech processing and pending validation. Local authentication and its user interaction review are complete; the user also approved the current UI on 2026-11-09, with responsive layout review deferred.
+
+## Shared text sizes
+
+All text sizes come from the `--font-size-*` variables at the top of [src/DefaultStyle.css](src/DefaultStyle.css). Component styles reference these variables or inherit them; headings use the shared `h1`, `h2` and `h3` rules without size overrides. Sizes stay consistent across themes and screen widths.
+
+| Role | Size |
+|---|---|
+| Heading 1 | 36px |
+| Heading 2 | 20px |
+| Heading 3 | 16px |
+| Header wordmark | 24px |
+| Body, controls, table text, badges and counts | 12px |
+| Secondary text and small labels | 10px |
+
+The wordmark uses the same 1.25 line-height, 650 font weight and proportional letter spacing in the header and sign-in title; only its size differs.
+
+Controls, tables and badges have named size variables that default to the body size. Change the shared variables to update their consumers throughout the app.

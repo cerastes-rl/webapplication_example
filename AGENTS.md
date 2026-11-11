@@ -1,4 +1,4 @@
-# AGENTS.md — SSScribe
+# AGENTS.md — OIGScribe
 
 ## Objective
 
@@ -19,7 +19,7 @@ Build a working local mock of an authenticated speech-to-text application. Prior
 
 The local upload-to-transcript flow is connected through Speech submission, polling and result import. UI/auth review was approved on 2026-11-09; connected browser/accessibility and responsive review remain pending.
 
-- `App.tsx` owns navigation, session state, API-backed History and one active-upload object. `run.ts` uses the API's fields and numeric run IDs directly; `history.ts` owns frontend search/sort/page preferences. Components stay one file per component; clients stay under `src/api/`.
+- `App.tsx` owns navigation, session state, API-backed History and one active-upload object. `run.ts` uses the API's fields and numeric run IDs directly; `history.ts` owns frontend search/sort/page preferences. Group components by responsibility as described below; clients stay under `src/api/`.
 - Connected uploads accept non-empty TXT up to **1,000,000 bytes inclusive**, English, Automatic/1–10 speakers, labels/timestamps default on. Begin upload creates a row, PUTs bytes directly to storage and POSTs completion; the API HEAD-verifies bytes before the worker submits to Speech. Speaker/label/timestamp settings are saved metadata.
 - `GET /api/runs` returns all owned rows; frontend controls pagination. Load History after sign-in/session restoration, on entering History, after mutations and on Refresh. Opening Upload/details should not reload the whole list.
 - Failed/interrupted uploads require reselection and a new submission. Cancellation aborts the local transfer and conditionally persists cancellation before DELETE. No preview fixtures, Check upload controls, fake attempt counters, request IDs, deduplication indexes or automatic creation retries.
@@ -27,6 +27,15 @@ The local upload-to-transcript flow is connected through Speech submission, poll
 - Root `services/` holds independent storage (8001) and Speech (8002) mocks sharing `backend/.venv`. Storage supports only PUT/HEAD/DELETE. Retain Speech's timed processing and 30-minute terminal-job expiry; files persist. Data remains under ignored `backend/data/`.
 - Austin/John keys and stable IDs are exactly `austin` and `john`. HttpOnly-cookie sessions live in memory; API restart requires sign-in without deleting records. Theme persists under `ssscribe-theme` where available. Stale responses must not restore signed-out data.
 - Use `.vscode/tasks.json` for automatic startup; no duplicate startup shell helper. Declare only direct Python dependencies in `requirements.txt`.
+
+## Shared frontend template
+
+- Keep `frontend/src/DefaultLayout.tsx` and `DefaultStyle.css` beside each other as the shared template entry points. `DefaultLayout` assembles the common screen structure; `DefaultStyle.css` owns shared themes, typography, spacing, controls and interaction states.
+- Keep application state, API orchestration, navigation choices and page content in `App.tsx` and app-specific components. Keep Scribe lettering, its pencil and transcription-specific layouts in `App.css`. Shared components receive app branding, content and actions through props.
+- Group small private components, markup and behavior with the component that uses them. Banner-only controls and behavior belong with `TopBanner`; sidebar navigation presentation and footer information belong with `Sidebar`. Multiple related components in one file are allowed and preferred when they form one reusable unit.
+- Give a component its own file when it is independently reused or substantial enough to be easier to maintain separately. Keep independently reused branding separate from the banner; OIGScribe branding is supplied by the app. Keep imports direct and the folder structure shallow.
+- Favor a small, understandable set of template files that can be carried into another app. Do not create a file for every JSX fragment, or combine unrelated responsibilities merely to reduce file count. No package or extra abstraction is needed for the current single-app template.
+- Shared controls use the common styles and text-size variables in `DefaultStyle.css`. Preserve consistent OIG logo proportions, spacing and alignment across apps. Put an app-specific exception in its app stylesheet only when the app needs it.
 
 ## Planned connected architecture
 

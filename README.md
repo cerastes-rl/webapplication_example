@@ -1,6 +1,6 @@
 # OIGScribe — Transcription workspace
 
-The OIGScribe wordmark uses italic “Scribe” with a pencil replacing its “i”.
+The OIG seal (`frontend/src/assets/oigseal.png`) appears beside the wordmark in the header and on the sign-in screen. Its diameter is the accompanying text size × 1.618, and its gap is the text size ÷ 1.618² (about 9px in the header and 14px on sign-in). Both wordmark locations share line-height, weight and proportional letter spacing. The OIGScribe wordmark uses italic “Scribe” with a pencil replacing its “i”. The app uses Arial with a 12px base font size with 12px buttons and History table text, and 36px main headings. Panels, forms and tables use compact padding and gaps. Hovered and selected buttons, hovered dropdowns, and hovered or focused text boxes share a light-blue border in both themes. The top header stays blue (`#15263B`) with light text in both themes.
 
 OIGScribe is a local transcription workspace with Austin/John sign-in, persistent user-owned History and direct text-file uploads to a standalone storage mock. Runs and options live in SQLite; file bytes live on disk. A backend worker submits uploads to the Speech mock, polls jobs and imports readable transcripts. Theme preference persists in localStorage.
 
@@ -14,12 +14,20 @@ OIGScribe is a local transcription workspace with Austin/John sign-in, persisten
 - [UI research](docs/UI_RESEARCH.md): product references and design rationale.
 - [Agent instructions](AGENTS.md): implementation and documentation guidelines.
 
+The Upload page places file selection and transcription settings side by side on desktop, with submission below. A clearly visible instructions panel on the right explains all three steps. The panels stack on small screens.
+
+## Shared styling
+
+[DefaultLayout.tsx](frontend/src/DefaultLayout.tsx) and [DefaultStyle.css](frontend/src/DefaultStyle.css) are the shared template entry points. The layout assembles the banner, sidebar, footer and content area; apps supply branding, navigation, content and actions. Shared styling includes themes, typography, controls and OIG logo proportions/alignment. OIGScribe behavior stays in `App.tsx`; its Scribe lettering, pencil and screen layouts stay in `App.css`.
+
+Group small private components with their parent reusable unit, keeping independently reused or substantial components separate. See the [shared template conventions](AGENTS.md#shared-frontend-template) and [text sizing guide](frontend/README.md#shared-text-sizes).
+
 ## Current capabilities
 
 - Austin/John sign-in, session restoration, navy accents and light/dark themes.
 - Non-empty TXT mock files up to **1,000,000 bytes inclusive**; saved English, Automatic/1–10 speakers, labels and timestamp options.
-- Begin upload persists a run, sends bytes directly to storage with measured progress, then verifies stored size. The worker submits completed uploads to Speech and imports results. Navigation preserves the transfer. The top banner shows upload progress and reminds users to keep the application open until it finishes.
-- History reads only the signed-in user's SQLite records, with filename search, sorting, pagination, Refresh and details. Reload and API restart preserve records; API restart requires signing in again.
+- Begin upload persists a run, sends bytes directly to storage with measured progress, then verifies stored size. The worker submits completed uploads to Speech and imports results. Navigation preserves the transfer. The Transcriptions table shows upload progress and transcription status.
+- History reads only the signed-in user's SQLite records, with compact All recordings / Ready to read / In progress filter buttons, filename search, sorting, pagination, Refresh and details. Reload and API restart preserve records; API restart requires signing in again.
 - Cancel aborts the local transfer and persists cancellation. An interrupted or unconfirmed upload requires file reselection and a new submission.
 - Stored completed transcripts, when present, are fetched separately and displayed/copied/downloaded verbatim. Refresh History to see backend processing updates and open completed transcripts.
 

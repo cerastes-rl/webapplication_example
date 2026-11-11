@@ -33,12 +33,14 @@ frontend/
     main.tsx                 React entry point
     App.tsx                  Shell, session, History loading and active upload
     run.ts                   API-shaped Run type, upload limit and formatting
-    history.ts               Search/sort/page preferences
+    history.ts               Search/status-filter/sort/page preferences
     api/auth.ts              Authentication calls and session response handling
     api/recordings.ts        Recording calls and direct XHR PUT/progress/abort
-    components/              One component per file
-    App.css                  Layout and component styles
-    index.css                Theme tokens and global defaults
+    assets/oigseal.png       OIG seal image used by the shared Logo component
+    components/              Shared units and app-specific screen components
+    App.css                  Scribe branding, recording, upload and transcript layouts
+    DefaultLayout.tsx        Shared banner, sidebar, footer and content structure
+    DefaultStyle.css         Shared themes, typography, controls and app shell
   tests/                     Auth and recording-client/XHR checks
   public/favicon.svg         Static favicon
   vite.config.ts             Port 5173 and /api proxy to port 8000
@@ -46,14 +48,16 @@ frontend/
 .devcontainer/               Shared development environment and port forwarding
 ```
 
-`components/` contains `Brand`, `Wordmark`, `Icon`, `EmptyState`, `SignInForm`, `UploadPage`, `HistoryPage`, `RunDetail`, `StatusBadge` and `SortableHeader`. Keep the layout shallow and import components directly. See the [frontend source layout](../frontend/README.md#source-layout).
+`components/` contains `TopBanner`, `Sidebar`, `Brand`, `Logo`, `ScribeWordmark`, `Icon`, `EmptyState`, `SignInForm`, `UploadPage`, `HistoryPage`, `RunDetail`, `StatusBadge`, `SortableHeader`. `DefaultLayout` assembles the banner, sidebar, footer, skip link and signed-in/sign-in content containers. Apps supply branding, navigation, content and actions. `TopBanner.tsx` receives the app brand and keeps its private theme toggle, user identity and sign-out components together. `Sidebar.tsx` keeps navigation presentation and sidebar footer information together, receiving app navigation, name, version and description. The small page footer is inline in `DefaultLayout.tsx`. These components use shared `DefaultStyle.css` styles; `App.tsx` retains navigation, authentication and upload state/actions. The private `ThemeToggle` in `TopBanner.tsx` owns theme selection, system-preference fallback, the document theme attribute and persistence under `ssscribe-theme`; its appearance remains in `DefaultStyle.css`. `Logo` imports `frontend/src/assets/oigseal.png` for the header and sign-in title. Shared CSS derives its diameter and gap from each text-size variable using `--golden-ratio` (1.618): diameter = text size × ratio; gap = text size ÷ ratio². Group small private components with their parent reusable unit; separate independently reused or substantial components. Keep the layout shallow and import components directly. See the [shared template conventions](../AGENTS.md#shared-frontend-template). See the [frontend source layout](../frontend/README.md#source-layout).
+
+The Upload screen uses a two-column form for file selection and transcription settings, with submission below the form and a clearly visible instructions panel on the right. The form panels stack at narrower widths; mobile uses a single column with instructions still visible. Its layout rules live in `frontend/src/App.css`.
 
 ## Current request flow
 
 1. `App.tsx` restores the session or calls `api/auth.ts` from sign-in.
-2. After sign-in/restoration, `GET /api/runs` returns all owned rows. The frontend searches, sorts and slices pages locally. History reloads on entry, after mutations and on Refresh; Upload/details navigation does not reload it.
+2. After sign-in/restoration, `GET /api/runs` returns all owned rows. The frontend filters by filename and status, sorts and slices pages locally. History reloads on entry, after mutations and on Refresh; Upload/details navigation does not reload it.
 3. Begin upload passes the File/options to the shell. `POST /api/uploads/authorize` inserts one run and returns a local blob URL using the original filename and headers.
-4. XHR sends bytes directly to storage, tracking measured progress. One shell-owned upload object contains its controller, numeric run ID and progress across navigation. The top banner displays its progress and a reminder to keep the application open until the upload finishes.
+4. XHR sends bytes directly to storage, tracking measured progress. One shell-owned upload object contains its controller, numeric run ID and progress across navigation. Upload progress and transcription status are displayed in the Transcriptions table.
 5. `POST /api/uploads/complete` HEAD-verifies size before setting upload completed / transcription not started. The background worker submits eligible runs, polls active jobs and imports succeeded transcripts.
 6. Cancellation aborts the local request, conditionally saves cancellation and asks storage to DELETE. Failed/interrupted uploads require reselection/new submissions.
 7. Completed transcript text is fetched separately and displayed/copied/downloaded verbatim.
@@ -115,7 +119,8 @@ No runtime data or secrets belong in Git. Tests use temporary databases/storage 
 
 ## Common editing locations
 
-- UI layout/theme: `frontend/src/App.css`, `index.css` and the relevant component.
+- Shared design styles: `frontend/src/DefaultStyle.css` (themes, typography, spacing, controls, navigation and shell, including responsive rules). Dropdown and text-box appearance, borders and interaction states are defined here; `App.css` only adjusts their screen-specific placement and dimensions. OIG logo size, spacing from the name and vertical alignment stay here for consistency across apps. Reuse this stylesheet across apps. Its `--font-size-*` variables define all text sizes; headings inherit the shared hierarchy without component or mobile size overrides.
+- OIGScribe-specific italic Scribe and pencil styling, plus screen layouts: `frontend/src/App.css` and the relevant component.
 - Upload policy: `frontend/src/run.ts`, `UploadPage.tsx`, `backend/api/uploads.py` and the storage limit.
 - Routes/contracts: `backend/api/`; SQL: `backend/src/database.py`, `schema.sql`.
 - Startup: `.vscode/tasks.json`; environment/forwarded ports: `.devcontainer/devcontainer.json`.

@@ -1,16 +1,11 @@
-import { Wordmark } from './Wordmark'
+import { Logo } from './Logo'
+import { ScribeWordmark } from './ScribeWordmark'
 
 export function Brand() {
   return (
     <div className="brand">
-      <span className="brand-mark" aria-hidden="true">
-        <i />
-        <i />
-        <i />
-        <i />
-        <i />
-      </span>
-      <Wordmark />
+      <Logo />
+      <ScribeWordmark />
     </div>
   )
 }

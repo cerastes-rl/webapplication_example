@@ -46,7 +46,7 @@ export function UploadPage({ onBegin, busy }: { onBegin: (file: File, settings: 
         </div>
       </div>
       <div className="upload-layout">
-        <form onSubmit={submit} noValidate>
+        <form className="upload-form" onSubmit={submit} noValidate>
           <section className="panel form-panel">
             <div className="section-heading">
               <span className="step-number">1</span>
@@ -142,8 +142,8 @@ export function UploadPage({ onBegin, busy }: { onBegin: (file: File, settings: 
             </div>
           </div>
         </form>
-        <aside className="upload-aside">
-          <h2>Instructions</h2>
+        <aside className="upload-aside" aria-labelledby="upload-instructions">
+          <h2 id="upload-instructions">Instructions</h2>
           <ol>
             <li>
               <strong>Choose your audio file</strong>

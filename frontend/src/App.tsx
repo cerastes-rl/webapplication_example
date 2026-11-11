@@ -11,6 +11,7 @@ import { HistoryPage } from './components/HistoryPage.tsx'
 import { Icon } from './components/Icon.tsx'
 import { RunDetail } from './components/RunDetail.tsx'
 import { SignInForm } from './components/SignInForm.tsx'
+import { DefaultLayout } from './DefaultLayout.tsx'
 import { UploadPage } from './components/UploadPage.tsx'
 import { initialHistoryView } from './history.ts'
 import type { Run, UploadProgress } from './run.ts'
@@ -18,23 +19,6 @@ import './App.css'
 
 type Page = 'history' | 'upload' | 'detail'
 function App(): ReactNode {
-  const [darkMode, setDarkMode] = useState(() => {
-    try {
-      const saved = localStorage.getItem('ssscribe-theme')
-      if (saved === 'dark' || saved === 'light') return saved === 'dark'
-    } catch {
-      /* Theme selection also works when storage is unavailable. */
-    }
-    return window.matchMedia('(prefers-color-scheme: dark)').matches
-  })
-  useEffect(() => {
-    document.documentElement.dataset.theme = darkMode ? 'dark' : 'light'
-    try {
-      localStorage.setItem('ssscribe-theme', darkMode ? 'dark' : 'light')
-    } catch {
-      /* Nonessential preference. */
-    }
-  }, [darkMode])
   const [user, setUser] = useState<User | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [authBusy, setAuthBusy] = useState(false)
@@ -281,104 +265,53 @@ function App(): ReactNode {
     )
   }
   return (
-    <>
-      <a className="skip-link" href="#main">
-        Skip to content
-      </a>
-      <header className="topbar">
-        <Brand />
-        <div className="upload-banner" role="status">
-          {signedIn && upload && <>
-            <strong>{upload.run_id === null ? 'Preparing upload…' : upload.progress === 100 ? 'Finalizing upload…' : `Uploading… ${upload.progress}%`}</strong>
-            <span>Keep the application open until the upload finishes.</span>
-          </>}
-        </div>
-        <div className="header-right">
+    <DefaultLayout
+      appName="OIGScribe"
+      version={APP_VERSION}
+      description="Files and run history are saved by the local services."
+      brand={<Brand />}
+      user={user}
+      signingOut={authBusy}
+      onSignOut={signOut}
+      mainRef={main}
+      navigation={
+        <>
           <button
-            className="theme-toggle"
-            type="button"
-            aria-label="Dark mode"
-            aria-pressed={darkMode}
-            title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-            onClick={() => setDarkMode((current) => !current)}
+            className={page === 'upload' ? 'nav-item active' : 'nav-item'}
+            aria-current={page === 'upload' ? 'page' : undefined}
+            onClick={() => navigate('upload')}
           >
-            <Icon name={darkMode ? 'sun' : 'moon'} size={17} />
-            <span className="theme-toggle-label">Dark mode</span>
-            <span className="theme-switch" aria-hidden="true">
-              <span />
-            </span>
+            <Icon name="upload" />
+            Upload
           </button>
-          <span className="demo-pill">
-            <span />
-            LOCAL DEMO
-          </span>
-          {signedIn && (
-            <>
-              <div className="identity">
-                <span className="avatar">{user?.name.charAt(0)}</span>
-                <span>
-                  {user?.name}
-                  <small>Local user</small>
-                </span>
-              </div>
-              <button className="signout" onClick={signOut} disabled={authBusy}>
-                <Icon name="logout" size={17} />
-                <span>{authBusy ? 'Signing out…' : 'Sign out'}</span>
-              </button>
-            </>
-          )}
-        </div>
-      </header>
+          <button
+            className={page !== 'upload' ? 'nav-item active' : 'nav-item'}
+            aria-current={page !== 'upload' ? 'page' : undefined}
+            onClick={() => navigate('history')}
+          >
+            <Icon name="history" />
+            Transcriptions<span className="nav-count">{runs.length}</span>
+          </button>
+        </>
+      }
+    >
       {!signedIn ? (
-        <main className="signin-wrap" id="main" tabIndex={-1} ref={main}>
-          <SignInForm
-            accessKey={accessKey}
-            loading={authLoading}
-            busy={authBusy}
-            error={authError}
-            onAccessKeyChange={setAccessKey}
-            onSubmit={submitSignIn}
-          />
-        </main>
+        <SignInForm
+          accessKey={accessKey}
+          loading={authLoading}
+          busy={authBusy}
+          error={authError}
+          onAccessKeyChange={setAccessKey}
+          onSubmit={submitSignIn}
+        />
       ) : (
-        <div className="workspace">
-          <aside className="sidebar">
-            <div className="workspace-label">WORKSPACE</div>
-            <nav aria-label="Main navigation">
-              <button
-                className={page === 'upload' ? 'nav-item active' : 'nav-item'}
-                aria-current={page === 'upload' ? 'page' : undefined}
-                onClick={() => navigate('upload')}
-              >
-                <Icon name="upload" />
-                Upload
-              </button>
-              <button
-                className={page !== 'upload' ? 'nav-item active' : 'nav-item'}
-                aria-current={page !== 'upload' ? 'page' : undefined}
-                onClick={() => navigate('history')}
-              >
-                <Icon name="history" />
-                History<span className="nav-count">{runs.length}</span>
-              </button>
-            </nav>
-            <div className="sidebar-bottom">
-              <span className="local-dot" /> Built for local exploration
-              <p>Files and run history are saved by the local services.</p>
-              <span className="version">OIGScribe / {APP_VERSION}</span>
-            </div>
-          </aside>
-          <main className="main-content" id="main" ref={main} tabIndex={-1}>
-            {page !== 'history' && <div className="notification" role="status">{notice}</div>}
-            {dataError && <div role="alert">{dataError} {page !== 'history' && <button className="button secondary" onClick={refreshHistory}>Refresh</button>}</div>}
-            {renderPage()}
-            <footer className="page-footer">
-              <span>OIGScribe version {APP_VERSION} · Development</span>
-            </footer>
-          </main>
-        </div>
+        <>
+          {page !== 'history' && <div className="notification" role="status">{notice}</div>}
+          {dataError && <div role="alert">{dataError} {page !== 'history' && <button className="button secondary" onClick={refreshHistory}>Refresh</button>}</div>}
+          {renderPage()}
+        </>
       )}
-    </>
+    </DefaultLayout>
   )
 }
 export default App
