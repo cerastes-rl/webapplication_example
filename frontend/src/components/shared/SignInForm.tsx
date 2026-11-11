@@ -1,9 +1,9 @@
-import type { FormEvent } from 'react'
+import type { FormEvent, ReactNode } from 'react'
 import { Icon } from './Icon'
-import { ScribeWordmark } from './ScribeWordmark'
-import { Logo } from './Logo'
 
 type SignInFormProps = {
+  branding: ReactNode
+  description: string
   accessKey: string
   loading: boolean
   busy: boolean
@@ -13,6 +13,8 @@ type SignInFormProps = {
 }
 
 export function SignInForm({
+  branding,
+  description,
   accessKey,
   loading,
   busy,
@@ -22,10 +24,8 @@ export function SignInForm({
 }: SignInFormProps) {
   return (
     <div className="panel signin-card">
-      <h1><Logo /><ScribeWordmark /></h1>
-      <p>
-        An application to upload user recordings, track transcription progress, and view transcripts.
-      </p>
+      <h1>{branding}</h1>
+      <p>{description}</p>
       {loading ? (
         <p role="status">Checking your session…</p>
       ) : (

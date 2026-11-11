@@ -1,12 +1,12 @@
 import { useRef } from 'react'
 import type { ReactElement } from 'react'
-import { matchesHistoryFilter } from '../history.ts'
-import type { HistoryFilter, HistoryViewState } from '../history.ts'
-import { formatDate, formatSize } from '../run.ts'
-import type { Run, UploadProgress } from '../run.ts'
+import { matchesHistoryFilter } from '../../history.ts'
+import type { HistoryFilter, HistoryViewState } from '../../history.ts'
+import { formatDate, formatSize } from '../../run.ts'
+import type { Run, UploadProgress } from '../../run.ts'
 import { EmptyState } from './EmptyState.tsx'
-import { Icon } from './Icon.tsx'
-import { SortableHeader } from './SortableHeader.tsx'
+import { Icon } from '../shared/Icon.tsx'
+import { SortableHeader } from '../shared/SortableHeader.tsx'
 import { StatusBadge } from './StatusBadge.tsx'
 
 type HistoryPageProps = {

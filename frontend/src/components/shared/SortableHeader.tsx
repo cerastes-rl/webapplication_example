@@ -1,12 +1,11 @@
 import type { ReactElement } from 'react'
-import type { HistoryViewState } from '../history.ts'
 import { Icon } from './Icon.tsx'
 
 const sortIcons = { none: 'sort', ascending: 'arrow-up', descending: 'arrow-down' } as const
 
 type SortableHeaderProps = {
   label: string
-  direction: HistoryViewState['sort']['direction'] | 'none'
+  direction: 'ascending' | 'descending' | 'none'
   onSort: () => void
 }
 

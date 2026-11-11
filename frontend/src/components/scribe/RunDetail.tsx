@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { formatDate, formatSize } from '../run'
-import type { Run } from '../run'
+import { formatDate, formatSize } from '../../run'
+import type { Run } from '../../run'
 import { EmptyState } from './EmptyState'
 import { StatusBadge } from './StatusBadge'
 

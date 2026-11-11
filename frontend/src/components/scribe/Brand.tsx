@@ -1,4 +1,4 @@
-import { Logo } from './Logo'
+import { Logo } from '../shared/Logo'
 import { ScribeWordmark } from './ScribeWordmark'
 
 export function Brand() {

@@ -20,6 +20,8 @@ The Upload page places file selection and transcription settings side by side on
 
 [DefaultLayout.tsx](frontend/src/DefaultLayout.tsx) and [DefaultStyle.css](frontend/src/DefaultStyle.css) are the shared template entry points. The layout assembles the banner, sidebar, footer and content area; apps supply branding, navigation, content and actions. Shared styling includes themes, typography, controls and OIG logo proportions/alignment. OIGScribe behavior stays in `App.tsx`; its Scribe lettering, pencil and screen layouts stay in `App.css`.
 
+Reusable UI components live in `frontend/src/components/shared/`; Scribe branding and recording components live in `frontend/src/components/scribe/`. The shared sign-in form receives branding and description through props.
+
 Group small private components with their parent reusable unit, keeping independently reused or substantial components separate. See the [shared template conventions](AGENTS.md#shared-frontend-template) and [text sizing guide](frontend/README.md#shared-text-sizes).
 
 ## Current capabilities

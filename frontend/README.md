@@ -48,14 +48,15 @@ Node's built-in test runner covers auth, metadata contracts, whole-list reads, u
 | [src/main.tsx](src/main.tsx) | React entry point. |
 | [src/App.tsx](src/App.tsx) | Shell, auth, navigation, API-backed History and shell-owned transfer lifetime. |
 | [src/DefaultLayout.tsx](src/DefaultLayout.tsx) | Shared screen structure: banner, sidebar, inline page footer, skip link and content containers. Apps supply their content and actions. |
-| [src/components/TopBanner.tsx](src/components/TopBanner.tsx) | Shared banner with private theme-toggle logic, user identity and sign-out controls. Styles live in `DefaultStyle.css`. |
-| [src/components/Sidebar.tsx](src/components/Sidebar.tsx) | Shared navigation container and sidebar footer information. |
-| [src/components/SignInForm.tsx](src/components/SignInForm.tsx) | Sign-in form, session-check message and auth feedback. |
-| [src/components/SortableHeader.tsx](src/components/SortableHeader.tsx) | Shared sortable table heading. |
-| [src/components/HistoryPage.tsx](src/components/HistoryPage.tsx) | History table, status filter buttons with counts, upload/transcription statuses and action buttons. |
-| [src/components/UploadPage.tsx](src/components/UploadPage.tsx) | File picker, options and upload form validation. |
-| [src/components/RunDetail.tsx](src/components/RunDetail.tsx) | Run information and stored transcript. |
-| `src/components/Icon.tsx`, `Brand.tsx`, `StatusBadge.tsx`, `EmptyState.tsx` | Shared UI components. |
+| [src/components/shared/TopBanner.tsx](src/components/shared/TopBanner.tsx) | Shared banner with private theme-toggle logic, user identity and sign-out controls. Styles live in `DefaultStyle.css`. |
+| [src/components/shared/Sidebar.tsx](src/components/shared/Sidebar.tsx) | Shared navigation container and sidebar footer information. |
+| [src/components/shared/SignInForm.tsx](src/components/shared/SignInForm.tsx) | Shared sign-in form, session-check message and auth feedback; app branding and description arrive through props. |
+| [src/components/shared/SortableHeader.tsx](src/components/shared/SortableHeader.tsx) | Shared sortable table heading. |
+| [src/components/scribe/HistoryPage.tsx](src/components/scribe/HistoryPage.tsx) | History table, status filter buttons with counts, upload/transcription statuses and action buttons. |
+| [src/components/scribe/UploadPage.tsx](src/components/scribe/UploadPage.tsx) | File picker, options and upload form validation. |
+| [src/components/scribe/RunDetail.tsx](src/components/scribe/RunDetail.tsx) | Run information and stored transcript. |
+| `src/components/shared/Icon.tsx`, `Logo.tsx` | Shared icons and OIG seal. |
+| `src/components/scribe/Brand.tsx`, `ScribeWordmark.tsx`, `StatusBadge.tsx`, `EmptyState.tsx` | Scribe branding, recording statuses and audio empty state. |
 | [src/api/auth.ts](src/api/auth.ts) | Auth requests and response handling. |
 | [src/api/recordings.ts](src/api/recordings.ts) | Direct API run types, recording requests and XHR upload/progress/abort. |
 | [package.json](package.json) | Dependencies, scripts and the version displayed in the footer/sidebar. |

@@ -5,14 +5,16 @@ import { getCurrentUser, signIn, signOut as endSession } from './api/auth.ts'
 import type { User } from './api/auth.ts'
 import { authorizeUpload, cancelUpload, completeUpload, failUpload, getTranscript, listRecordings, putFile } from './api/recordings.ts'
 import type { UploadSettings } from './api/recordings.ts'
-import { Brand } from './components/Brand.tsx'
-import { EmptyState } from './components/EmptyState.tsx'
-import { HistoryPage } from './components/HistoryPage.tsx'
-import { Icon } from './components/Icon.tsx'
-import { RunDetail } from './components/RunDetail.tsx'
-import { SignInForm } from './components/SignInForm.tsx'
+import { Logo } from './components/shared/Logo.tsx'
+import { ScribeWordmark } from './components/scribe/ScribeWordmark.tsx'
+import { Brand } from './components/scribe/Brand.tsx'
+import { EmptyState } from './components/scribe/EmptyState.tsx'
+import { HistoryPage } from './components/scribe/HistoryPage.tsx'
+import { Icon } from './components/shared/Icon.tsx'
+import { RunDetail } from './components/scribe/RunDetail.tsx'
+import { SignInForm } from './components/shared/SignInForm.tsx'
 import { DefaultLayout } from './DefaultLayout.tsx'
-import { UploadPage } from './components/UploadPage.tsx'
+import { UploadPage } from './components/scribe/UploadPage.tsx'
 import { initialHistoryView } from './history.ts'
 import type { Run, UploadProgress } from './run.ts'
 import './App.css'
@@ -297,6 +299,8 @@ function App(): ReactNode {
     >
       {!signedIn ? (
         <SignInForm
+          branding={<><Logo /><ScribeWordmark /></>}
+          description="An application to upload user recordings, track transcription progress, and view transcripts."
           accessKey={accessKey}
           loading={authLoading}
           busy={authBusy}

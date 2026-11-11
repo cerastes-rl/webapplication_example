@@ -1,6 +1,6 @@
 import type { ReactNode, Ref } from 'react'
-import { Sidebar } from './components/Sidebar'
-import { TopBanner } from './components/TopBanner'
+import { Sidebar } from './components/shared/Sidebar'
+import { TopBanner } from './components/shared/TopBanner'
 
 type DefaultLayoutProps = {
   appName: string

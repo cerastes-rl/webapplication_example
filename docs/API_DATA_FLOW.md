@@ -165,8 +165,8 @@ Line links identify the functions behind the diagram.
 
 | Responsibility / functions | Source |
 |---|---|
-| Session restoration, `loadHistory`, navigation and workspace state | [App.tsx:20](../frontend/src/App.tsx#L20) |
-| `submitSignIn`, `beginUpload`, `cancel`, `signOut` | [App.tsx:149](../frontend/src/App.tsx#L149) |
+| Session restoration, `loadHistory`, navigation and workspace state | [App.tsx:23](../frontend/src/App.tsx#L23) |
+| `submitSignIn`, `beginUpload`, `cancel`, `signOut` | [App.tsx:135](../frontend/src/App.tsx#L135) |
 | `getCurrentUser`, `signIn`, `signOut` HTTP calls | [api/auth.ts:47](../frontend/src/api/auth.ts#L47) |
 | `listRecordings`, upload/transcript requests and XHR `putFile` | [api/recordings.ts:28](../frontend/src/api/recordings.ts#L28) |
 | `/api` proxy to :8000 | [vite.config.ts:10](../frontend/vite.config.ts#L10) |
@@ -180,7 +180,7 @@ Line links identify the functions behind the diagram.
 | `blob_url`, `inspect_or_delete` | [storage_client.py:13](../backend/src/storage_client.py#L13) |
 | Streaming `put_blob`, `head_blob`, `delete_blob` | [storage_mock.py:61](../services/storage_mock.py#L61) |
 | Speech timers, result writing and submit/status/files routes | [speech_mock.py:78](../services/speech_mock.py#L78) |
-| Transcript display, copy and download | [RunDetail.tsx:7](../frontend/src/components/RunDetail.tsx#L7) |
+| Transcript display, copy and download | [RunDetail.tsx:7](../frontend/src/components/scribe/RunDetail.tsx#L7) |
 
 ## Planned live adapter
 
