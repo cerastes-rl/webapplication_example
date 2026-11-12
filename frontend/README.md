@@ -52,16 +52,17 @@ Node's built-in test runner covers auth, metadata contracts, whole-list reads, u
 | [src/components/shared/Sidebar.tsx](src/components/shared/Sidebar.tsx) | Shared navigation container and sidebar footer information. |
 | [src/components/shared/SignInForm.tsx](src/components/shared/SignInForm.tsx) | Shared sign-in form, session-check message and auth feedback; app branding and description arrive through props. |
 | [src/components/shared/SortableHeader.tsx](src/components/shared/SortableHeader.tsx) | Shared sortable table heading. |
-| [src/components/scribe/HistoryPage.tsx](src/components/scribe/HistoryPage.tsx) | History table, status filter buttons with counts, upload/transcription statuses and action buttons. |
-| [src/components/scribe/UploadPage.tsx](src/components/scribe/UploadPage.tsx) | File picker, options and upload form validation. |
-| [src/components/scribe/RunDetail.tsx](src/components/scribe/RunDetail.tsx) | Run information and stored transcript. |
+| [src/features/transcriptions/components/HistoryPage.tsx](src/features/transcriptions/components/HistoryPage.tsx) | History table, status filter buttons with counts, upload/transcription statuses and action buttons. |
+| [src/features/transcriptions/components/UploadPage.tsx](src/features/transcriptions/components/UploadPage.tsx) | File picker, options and upload form validation. |
+| [src/features/transcriptions/components/RunDetail.tsx](src/features/transcriptions/components/RunDetail.tsx) | Run information and stored transcript. |
 | `src/components/shared/Icon.tsx`, `Logo.tsx` | Shared icons and OIG seal. |
-| `src/components/scribe/Brand.tsx`, `ScribeWordmark.tsx`, `StatusBadge.tsx`, `EmptyState.tsx` | Scribe branding, recording statuses and audio empty state. |
+| `src/components/branding/Brand.tsx`, `ScribeWordmark.tsx` | OIGScribe branding. |
+| `src/features/transcriptions/components/StatusBadge.tsx`, `EmptyState.tsx` | Recording statuses and audio empty state. |
 | [src/api/auth.ts](src/api/auth.ts) | Auth requests and response handling. |
 | [src/api/recordings.ts](src/api/recordings.ts) | Direct API run types, recording requests and XHR upload/progress/abort. |
 | [package.json](package.json) | Dependencies, scripts and the version displayed in the footer/sidebar. |
-| [src/run.ts](src/run.ts) | Run contract, upload limit, date/size formatting and direct upload/transcription stages. |
-| [src/history.ts](src/history.ts) | History view preferences and defaults. |
+| [src/features/transcriptions/run.ts](src/features/transcriptions/run.ts) | Run contract, upload limit, date/size formatting and direct upload/transcription stages. |
+| [src/features/transcriptions/history.ts](src/features/transcriptions/history.ts) | History view preferences and defaults. |
 | [src/DefaultStyle.css](src/DefaultStyle.css) | Shared design styles for reuse across apps: themes, typography, controls, navigation and shell, including responsive rules. |
 | [src/App.css](src/App.css) | OIGScribe-specific recording, upload and transcript layouts. |
 

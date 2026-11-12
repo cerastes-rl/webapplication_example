@@ -1,4 +1,4 @@
-import type { Run } from '../../run'
+import type { Run } from '../run'
 
 export function StatusBadge({ status }: { status: Run['upload_stage'] | Run['transcription_stage'] | 'finalizing' }) {
   return (

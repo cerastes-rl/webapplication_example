@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Icon } from '../shared/Icon'
+import { Icon } from '../../../components/shared/Icon'
 
 export function EmptyState({
   title,

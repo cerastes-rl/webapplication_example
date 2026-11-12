@@ -1,4 +1,4 @@
-import type { Run } from '../run.ts'
+import type { Run } from '../features/transcriptions/run.ts'
 
 export type UploadSettings = {
   requested_speakers: number | null

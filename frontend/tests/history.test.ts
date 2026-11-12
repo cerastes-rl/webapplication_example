@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { matchesHistoryFilter } from '../src/history.ts'
-import type { Run } from '../src/run.ts'
+import { matchesHistoryFilter } from '../src/features/transcriptions/history.ts'
+import type { Run } from '../src/features/transcriptions/run.ts'
 
 test('History filters include active stages and keep failed or cancelled runs in All', () => {
   const stages: [Run['upload_stage'], Run['transcription_stage'], boolean, boolean][] = [

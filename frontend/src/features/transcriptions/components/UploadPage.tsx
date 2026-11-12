@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { formatSize, MAX_FILE_SIZE } from '../../run'
-import type { UploadSettings } from '../../api/recordings'
-import { Icon } from '../shared/Icon'
+import { formatSize, MAX_FILE_SIZE } from '../run'
+import type { UploadSettings } from '../../../api/recordings'
+import { Icon } from '../../../components/shared/Icon'
 
 export function UploadPage({ onBegin, busy }: { onBegin: (file: File, settings: UploadSettings) => void; busy: boolean }) {
   const [file, setFile] = useState<File | null>(null)

@@ -180,7 +180,7 @@ Line links identify the functions behind the diagram.
 | `blob_url`, `inspect_or_delete` | [storage_client.py:13](../backend/src/storage_client.py#L13) |
 | Streaming `put_blob`, `head_blob`, `delete_blob` | [storage_mock.py:61](../services/storage_mock.py#L61) |
 | Speech timers, result writing and submit/status/files routes | [speech_mock.py:78](../services/speech_mock.py#L78) |
-| Transcript display, copy and download | [RunDetail.tsx:7](../frontend/src/components/scribe/RunDetail.tsx#L7) |
+| Transcript display, copy and download | [RunDetail.tsx:7](../frontend/src/features/transcriptions/components/RunDetail.tsx#L7) |
 
 ## Planned live adapter
 
