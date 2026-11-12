@@ -1,0 +1,14 @@
+.git
+.devcontainer
+.vscode
+.codex
+.agents
+.aws
+**/.env
+**/.env.*
+**/.venv
+**/node_modules
+**/dist
+**/__pycache__
+**/*.pyc
+backend/data

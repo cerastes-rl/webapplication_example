@@ -48,6 +48,9 @@ frontend/
   tests/                     Auth and recording-client/XHR checks
   public/favicon.svg         Static favicon
   vite.config.ts             Port 5173 and /api proxy to port 8000
+Dockerfile                   Single image with Node/Python and startup for all four services
+.dockerignore                Excludes local data, secrets and generated files from builds
+docs/DOCKER.md               Docker CLI build, initialization and service commands
 .vscode/tasks.json           Automatic startup tasks and Initialize Database
 .devcontainer/               Shared development environment and port forwarding
 ```
@@ -107,6 +110,10 @@ The API uses `SSSCRIBE_STORAGE_URL` for backend requests and optional `SSSCRIBE_
 `services/speech_mock.py` still uses backend-relative paths under `backend/data/blobs/`. It reads UTF-8 text up to 1 MB, appends a fixed sentence and writes transcript/report JSON. Jobs spend 10 seconds in NotStarted and 20 seconds in Running. It supports submit, status, paginated result listings and downloads; `mock_fail=true` simulates failure.
 
 A maintenance loop progresses jobs without polling. Terminal in-memory jobs expire after 30 minutes; source/output files are retained. Restart clears jobs, preserving files. Run one worker without reload. The application worker connects submission, polling and result import to SQLite. Refresh History to see the updated stages. See [Speech startup and examples](../README.md#run-the-standalone-speech-mock).
+
+## Docker CLI
+
+The root `Dockerfile` builds one image containing Node.js, pnpm, Python and all application services. Its inline Bash command explicitly initializes the database, then runs Vite, FastAPI, storage and Speech in the same container. It forwards shutdown to the services and stops the container if any service exits. FastAPI itself does not initialize the database. The [Docker guide](DOCKER.md) mounts a named volume at `/app/backend/data` for SQLite records, uploaded files and Speech output; sessions and Speech jobs remain in memory. Internal service calls use localhost and existing ports. `.dockerignore` excludes checkout data and dependencies from image builds. VS Code automatic startup continues to use `.vscode/tasks.json`.
 
 ## Generated and local files
 

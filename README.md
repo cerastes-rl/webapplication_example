@@ -35,6 +35,10 @@ Group small private components with their parent reusable unit, keeping independ
 
 The earlier UI was approved on 2026-11-09; connected browser/accessibility review remains pending.
 
+## Run with Docker CLI
+
+The root [Dockerfile](Dockerfile) builds one image containing Node.js, pnpm, Python, the UI, API and both mocks. One container initializes the database and starts all four services. Follow the [Docker CLI guide](docs/DOCKER.md) to build and run it with a persistent data volume, then open **http://localhost:5173**.
+
 ## Run the UI
 
 Use the development container's Node.js/pnpm environment:
